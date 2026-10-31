@@ -1,0 +1,17 @@
+{
+  "name": "@asiavoyage/tokens",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tokens.css": "./src/tokens.css",
+    "./tokens.json": "./src/tokens.json",
+    "./tailwind-preset": "./src/tailwind-preset.ts"
+  },
+  "peerDependencies": {
+    "tailwindcss": "^3.4.0"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.19"
+  }
+}

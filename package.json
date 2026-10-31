@@ -1,0 +1,11 @@
+{
+  "name": "asiavoyage",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "dev": "corepack pnpm --filter @asiavoyage/web dev",
+    "build": "corepack pnpm --filter @asiavoyage/web build",
+    "start": "corepack pnpm --filter @asiavoyage/web start",
+    "typecheck": "corepack pnpm -r typecheck"
+  }
+}

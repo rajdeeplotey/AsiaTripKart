@@ -1,0 +1,901 @@
+openapi: 3.1.0
+info:
+  title: AsiaVoyage Public API
+  version: 1.0.0-outline
+  summary: One API for web, admin and the iOS/Android apps.
+  description: |
+    **Outline** — every endpoint, its phase, and the core schemas. Request/response bodies for Phase 2–4
+    endpoints are filled in as each squad picks them up; the shapes below are binding for Phase 1.
+
+    Conventions
+    - Versioned by path (`/v1`). Breaking changes ship as `/v2`; `/v1` stays live for 12 months after
+      `Deprecation` + `Sunset` headers appear.
+    - Auth: `Authorization: Bearer <JWT>` (15 min access token) + rotating refresh token. No cookies required
+      (web additionally stores the refresh token in an httpOnly cookie via the BFF).
+    - Money: `{ amount: integer (minor units), currency: "INR" }`. Clients never do FX maths;
+      send `X-Currency` and the API returns `price` (display) alongside `chargePrice`.
+    - Locale: `Accept-Language`; currency: `X-Currency` header or `?currency=`.
+    - Pagination: cursor-based (`?cursor=&limit=`), response `{ data, page: { nextCursor, hasMore, total? } }`.
+    - Images: every `Image` has a `url` template accepting `w`, `h`, `q`, `fm` params for the image CDN.
+    - Errors: RFC 9457 `application/problem+json`.
+    - Writes accept `Idempotency-Key`; checkout and payment endpoints require it.
+    - Sale-blocked countries (travel advisory) are filtered out of every public endpoint server-side.
+    - `x-phase` on each operation = delivery phase (1 Foundation, 2 Commerce, 3 Growth, 4 Mobile).
+  contact: { name: AsiaVoyage Platform Team }
+servers:
+  - url: https://api.asiavoyage.example/v1
+    description: Production
+  - url: https://api.staging.asiavoyage.example/v1
+    description: Staging
+security: []
+tags:
+  - { name: Config, description: 'Remote config, feature flags, currencies' }
+  - { name: Auth }
+  - { name: Me, description: 'Current user, devices, privacy' }
+  - { name: Content, description: 'CMS pages, navigation, banners, blog' }
+  - { name: Destinations }
+  - { name: Catalogue, description: 'Packages, activities, stays, transfers, add-ons' }
+  - { name: Search }
+  - { name: Cart & Checkout }
+  - { name: Bookings }
+  - { name: Wishlist }
+  - { name: Reviews }
+  - { name: Leads }
+  - { name: Webhooks, description: Inbound provider callbacks }
+  - { name: Admin, description: 'Role-gated back-office API (same service, /v1/admin/*)' }
+
+paths:
+  # ───────── Config ─────────
+  /config:
+    get:
+      tags: [Config]
+      operationId: getConfig
+      summary: Remote config + feature flags for the calling platform/app version
+      x-phase: 1
+      parameters:
+        - { name: platform, in: query, schema: { $ref: '#/components/schemas/Platform' } }
+        - { name: appVersion, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppConfig' }
+  /currencies:
+    get:
+      tags: [Config]
+      operationId: listCurrencies
+      summary: Supported display currencies with today's FX rates (base INR)
+      x-phase: 3
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+
+  # ───────── Auth ─────────
+  /auth/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      summary: Email + password sign-up
+      x-phase: 1
+      requestBody: { $ref: '#/components/requestBodies/Register' }
+      responses:
+        '201': { $ref: '#/components/responses/TokenPair' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      x-phase: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                totp: { type: string, description: Required for staff roles }
+      responses:
+        '200': { $ref: '#/components/responses/TokenPair' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+  /auth/otp/request:
+    post:
+      tags: [Auth]
+      operationId: requestOtp
+      summary: Send OTP via SMS or WhatsApp (rate-limited + bot-protected)
+      x-phase: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, channel]
+              properties:
+                phone: { type: string, description: E.164 }
+                channel: { type: string, enum: [sms, whatsapp] }
+                captchaToken: { type: string }
+      responses:
+        '202': { description: OTP sent }
+        '429': { $ref: '#/components/responses/Problem' }
+  /auth/otp/verify:
+    post:
+      tags: [Auth]
+      operationId: verifyOtp
+      x-phase: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, code]
+              properties:
+                phone: { type: string }
+                code: { type: string, pattern: '^[0-9]{6}$' }
+      responses:
+        '200': { $ref: '#/components/responses/TokenPair' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /auth/oauth/{provider}:
+    post:
+      tags: [Auth]
+      operationId: oauthSignIn
+      summary: Exchange a Google/Apple ID token (from web or native SDK) for a token pair
+      x-phase: 1
+      parameters:
+        - { name: provider, in: path, required: true, schema: { type: string, enum: [google, apple] } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [idToken]
+              properties:
+                idToken: { type: string }
+                nonce: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/TokenPair' }
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refreshToken
+      summary: Rotate refresh token (reuse ⇒ whole family revoked)
+      x-phase: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [refreshToken], properties: { refreshToken: { type: string } } }
+      responses:
+        '200': { $ref: '#/components/responses/TokenPair' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      x-phase: 1
+      security: [{ bearer: [] }]
+      responses: { '204': { description: Logged out } }
+  /auth/password/forgot:
+    post: { tags: [Auth], operationId: forgotPassword, x-phase: 1, responses: { '202': { description: Email sent if account exists } } }
+  /auth/password/reset:
+    post: { tags: [Auth], operationId: resetPassword, x-phase: 1, responses: { '204': { description: Password changed } } }
+
+  # ───────── Me ─────────
+  /me:
+    get:
+      tags: [Me]
+      operationId: getMe
+      x-phase: 1
+      security: [{ bearer: [] }]
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/User' } } }
+    patch:
+      tags: [Me]
+      operationId: updateMe
+      x-phase: 1
+      security: [{ bearer: [] }]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /me/devices:
+    post:
+      tags: [Me]
+      operationId: registerDevice
+      summary: Register push token (FCM/APNs/web push)
+      x-phase: 4
+      security: [{ bearer: [] }]
+      responses: { '201': { $ref: '#/components/responses/Ok' } }
+  /me/devices/{id}:
+    delete: { tags: [Me], operationId: deleteDevice, x-phase: 4, security: [{ bearer: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '204': { description: Removed } } }
+  /me/travellers:
+    get: { tags: [Me], operationId: listSavedTravellers, x-phase: 2, security: [{ bearer: [] }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    post: { tags: [Me], operationId: createSavedTraveller, x-phase: 2, security: [{ bearer: [] }], responses: { '201': { $ref: '#/components/responses/Ok' } } }
+  /me/consents:
+    get: { tags: [Me], operationId: listConsents, x-phase: 1, security: [{ bearer: [] }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    put: { tags: [Me], operationId: updateConsents, x-phase: 1, security: [{ bearer: [] }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /me/data-requests:
+    post:
+      tags: [Me]
+      operationId: createDataRequest
+      summary: DPDP / GDPR data export or erasure
+      x-phase: 1
+      security: [{ bearer: [] }]
+      responses: { '202': { $ref: '#/components/responses/Ok' } }
+  /me/loyalty:
+    get: { tags: [Me], operationId: getLoyalty, x-phase: 3, security: [{ bearer: [] }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+
+  # ───────── Content ─────────
+  /navigation/{key}:
+    get:
+      tags: [Content]
+      operationId: getNavigation
+      summary: Header mega-menu / footer / mobile drawer (edge-cached, purged on publish)
+      x-phase: 1
+      parameters:
+        - { name: key, in: path, required: true, schema: { type: string, enum: [header, footer, mobile-drawer, utility] } }
+      responses:
+        '200':
+          description: OK
+          headers:
+            Cache-Control: { schema: { type: string, example: 'public, s-maxage=300, stale-while-revalidate=86400' } }
+          content: { application/json: { schema: { $ref: '#/components/schemas/NavigationMenu' } } }
+  /pages/{slug}:
+    get:
+      tags: [Content]
+      operationId: getPage
+      summary: CMS page as ordered blocks (home = 14 blocks). `?preview=<token>` for drafts.
+      x-phase: 1
+      parameters:
+        - { $ref: '#/components/parameters/Slug' }
+        - { name: preview, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/Page' } } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /banners:
+    get:
+      tags: [Content]
+      operationId: listBanners
+      x-phase: 1
+      parameters:
+        - { name: placement, in: query, required: true, schema: { type: string } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /blog/posts:
+    get: { tags: [Content], operationId: listBlogPosts, x-phase: 3, parameters: [{ $ref: '#/components/parameters/Cursor' }, { $ref: '#/components/parameters/Limit' }, { name: category, in: query, schema: { type: string } }, { name: country, in: query, schema: { type: string } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /blog/posts/{slug}:
+    get: { tags: [Content], operationId: getBlogPost, x-phase: 3, parameters: [{ $ref: '#/components/parameters/Slug' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /redirects/resolve:
+    get:
+      tags: [Content]
+      operationId: resolveRedirect
+      summary: Used by web middleware (cached) to apply CMS-managed 301s
+      x-phase: 1
+      parameters: [{ name: path, in: query, required: true, schema: { type: string } }]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { description: No redirect } }
+
+  # ───────── Destinations ─────────
+  /regions:
+    get:
+      tags: [Destinations]
+      operationId: listRegions
+      x-phase: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: { data: { type: array, items: { $ref: '#/components/schemas/RegionSummary' } } }
+  /regions/{slug}:
+    get:
+      tags: [Destinations]
+      operationId: getRegion
+      x-phase: 1
+      parameters: [{ $ref: '#/components/parameters/Slug' }]
+      responses:
+        '200':
+          description: Region with its countries
+          content: { application/json: { schema: { $ref: '#/components/schemas/Region' } } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /countries/{slug}:
+    get:
+      tags: [Destinations]
+      operationId: getCountry
+      x-phase: 1
+      parameters: [{ $ref: '#/components/parameters/Slug' }]
+      responses:
+        '200':
+          description: Overview, best time, top cities, visa info, FAQs, featured packages
+          content: { application/json: { schema: { $ref: '#/components/schemas/Country' } } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /cities/{slug}:
+    get: { tags: [Destinations], operationId: getCity, x-phase: 1, parameters: [{ $ref: '#/components/parameters/Slug' }], responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/Problem' } } }
+  /destinations/trending:
+    get: { tags: [Destinations], operationId: listTrendingDestinations, x-phase: 1, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /destinations/seasonal:
+    get:
+      tags: [Destinations]
+      operationId: listSeasonalDestinations
+      summary: '"Where to go in <month>" from bestMonths data'
+      x-phase: 1
+      parameters: [{ name: month, in: query, schema: { type: integer, minimum: 1, maximum: 12 } }]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /themes:
+    get: { tags: [Destinations], operationId: listThemes, x-phase: 1, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+
+  # ───────── Catalogue ─────────
+  /packages:
+    get:
+      tags: [Catalogue]
+      operationId: listPackages
+      summary: Listing with facets (served from search index, hydrated from DB)
+      x-phase: 1
+      parameters:
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/Limit' }
+        - { name: country, in: query, schema: { type: string } }
+        - { name: city, in: query, schema: { type: string } }
+        - { name: region, in: query, schema: { type: string } }
+        - { name: theme, in: query, schema: { type: array, items: { type: string } }, style: form, explode: false }
+        - { name: nightsMin, in: query, schema: { type: integer } }
+        - { name: nightsMax, in: query, schema: { type: integer } }
+        - { name: budgetMin, in: query, schema: { type: integer }, description: Minor units in display currency }
+        - { name: budgetMax, in: query, schema: { type: integer } }
+        - { name: month, in: query, schema: { type: string, pattern: '^[0-9]{4}-[0-9]{2}$' } }
+        - { name: departureCity, in: query, schema: { type: string } }
+        - { name: inclusions, in: query, schema: { type: array, items: { type: string } }, style: form, explode: false }
+        - { name: hotelStars, in: query, schema: { type: integer, minimum: 1, maximum: 5 } }
+        - { name: sort, in: query, schema: { type: string, enum: [popular, price_asc, price_desc, duration_asc, duration_desc, rating] } }
+        - { name: flag, in: query, schema: { type: string, enum: [best_seller, trending, deal] } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, page]
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/PackageCard' } }
+                  facets: { $ref: '#/components/schemas/Facets' }
+                  page: { $ref: '#/components/schemas/PageInfo' }
+  /packages/{slug}:
+    get:
+      tags: [Catalogue]
+      operationId: getPackage
+      x-phase: 2
+      parameters: [{ $ref: '#/components/parameters/Slug' }]
+      responses:
+        '200':
+          description: Full detail incl. itinerary, hotel tiers, add-ons, policies, FAQs, JSON-LD-ready fields
+          content: { application/json: { schema: { $ref: '#/components/schemas/PackageDetail' } } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /packages/{slug}/departures:
+    get:
+      tags: [Catalogue]
+      operationId: listPackageDepartures
+      summary: Departure calendar with live prices & seats (short TTL cache)
+      x-phase: 2
+      parameters:
+        - { $ref: '#/components/parameters/Slug' }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { name: tier, in: query, schema: { $ref: '#/components/schemas/HotelTier' } }
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /packages/{slug}/price-calendar:
+    get: { tags: [Catalogue], operationId: getPackagePriceCalendar, summary: Cheapest price per month, x-phase: 2, parameters: [{ $ref: '#/components/parameters/Slug' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /packages/{slug}/quote:
+    post:
+      tags: [Catalogue]
+      operationId: pricePackage
+      summary: Price a configuration (departure, tier, pax, add-ons, customisations) without creating a cart
+      x-phase: 2
+      parameters: [{ $ref: '#/components/parameters/Slug' }]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /packages/{slug}/similar:
+    get: { tags: [Catalogue], operationId: listSimilarPackages, x-phase: 2, parameters: [{ $ref: '#/components/parameters/Slug' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /packages/compare:
+    get:
+      tags: [Catalogue]
+      operationId: comparePackages
+      x-phase: 3
+      parameters: [{ name: slugs, in: query, required: true, schema: { type: array, maxItems: 3, items: { type: string } }, style: form, explode: false }]
+      responses: { '200': { $ref: '#/components/responses/Ok' } }
+  /activities:
+    get: { tags: [Catalogue], operationId: listActivities, x-phase: 2, parameters: [{ $ref: '#/components/parameters/Cursor' }, { $ref: '#/components/parameters/Limit' }, { name: city, in: query, schema: { type: string } }, { name: category, in: query, schema: { type: string } }, { name: sort, in: query, schema: { type: string } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /activities/{slug}:
+    get: { tags: [Catalogue], operationId: getActivity, x-phase: 2, parameters: [{ $ref: '#/components/parameters/Slug' }], responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/Problem' } } }
+  /activities/{slug}/availability:
+    get: { tags: [Catalogue], operationId: getActivityAvailability, x-phase: 2, parameters: [{ $ref: '#/components/parameters/Slug' }, { name: month, in: query, schema: { type: string } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /stays:
+    get: { tags: [Catalogue], operationId: listStays, x-phase: 2, parameters: [{ $ref: '#/components/parameters/Cursor' }, { $ref: '#/components/parameters/Limit' }, { name: city, in: query, schema: { type: string } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /stays/{slug}:
+    get: { tags: [Catalogue], operationId: getStay, x-phase: 2, parameters: [{ $ref: '#/components/parameters/Slug' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /stays/{slug}/rates:
+    get: { tags: [Catalogue], operationId: getStayRates, x-phase: 2, parameters: [{ $ref: '#/components/parameters/Slug' }, { name: checkIn, in: query, required: true, schema: { type: string, format: date } }, { name: checkOut, in: query, required: true, schema: { type: string, format: date } }, { name: guests, in: query, schema: { type: integer } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /transfers:
+    get: { tags: [Catalogue], operationId: listTransfers, x-phase: 2, parameters: [{ name: city, in: query, schema: { type: string } }, { name: type, in: query, schema: { type: string } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /add-ons:
+    get: { tags: [Catalogue], operationId: listAddOns, summary: 'Visa, insurance, eSIM, forex (flights only via package context)', x-phase: 2, parameters: [{ name: country, in: query, schema: { type: string } }, { name: package, in: query, schema: { type: string } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /deals:
+    get: { tags: [Catalogue], operationId: listDeals, x-phase: 3, parameters: [{ name: type, in: query, schema: { type: string, enum: [last-minute, early-bird, under-budget] } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+
+  # ───────── Search ─────────
+  /search/suggest:
+    get:
+      tags: [Search]
+      operationId: searchSuggest
+      summary: Typo-tolerant autocomplete for the hero search bar (destinations first, then packages/activities)
+      x-phase: 1
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 1 } }
+        - { name: tab, in: query, schema: { type: string, enum: [packages, things-to-do, stays] } }
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/SearchSuggestions' } } }
+  /search:
+    get: { tags: [Search], operationId: search, x-phase: 2, parameters: [{ name: q, in: query, required: true, schema: { type: string } }, { $ref: '#/components/parameters/Cursor' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+
+  # ───────── Cart & Checkout ─────────
+  /carts:
+    post:
+      tags: [Cart & Checkout]
+      operationId: createCart
+      summary: Create draft booking; holds seats for 15 min
+      x-phase: 2
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '201': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/Problem' } }
+  /carts/{id}:
+    get: { tags: [Cart & Checkout], operationId: getCart, x-phase: 2, parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    patch: { tags: [Cart & Checkout], operationId: updateCart, summary: 'Change tier, pax, add-ons', x-phase: 2, parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /carts/{id}/travellers:
+    put: { tags: [Cart & Checkout], operationId: setCartTravellers, x-phase: 2, parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /carts/{id}/coupon:
+    put: { tags: [Cart & Checkout], operationId: applyCoupon, x-phase: 3, parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/Ok' }, '422': { $ref: '#/components/responses/Problem' } } }
+    delete: { tags: [Cart & Checkout], operationId: removeCoupon, x-phase: 3, parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /carts/{id}/checkout:
+    post:
+      tags: [Cart & Checkout]
+      operationId: checkout
+      summary: Choose payment plan (FULL / DEPOSIT_25 / EMI) and provider; returns hosted-payment session (Razorpay order or Stripe PaymentIntent client secret)
+      x-phase: 2
+      parameters: [{ $ref: '#/components/parameters/Id' }, { $ref: '#/components/parameters/IdempotencyKey' }]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '409': { $ref: '#/components/responses/Problem' } }
+
+  # ───────── Bookings ─────────
+  /me/bookings:
+    get: { tags: [Bookings], operationId: listMyBookings, x-phase: 2, security: [{ bearer: [] }], parameters: [{ $ref: '#/components/parameters/Cursor' }, { name: status, in: query, schema: { type: string, enum: [upcoming, past, cancelled] } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /bookings/{reference}:
+    get:
+      tags: [Bookings]
+      operationId: getBooking
+      summary: Owner (bearer) or signed confirmation token; includes day-by-day itinerary for offline use in app
+      x-phase: 2
+      parameters: [{ name: reference, in: path, required: true, schema: { type: string } }, { name: token, in: query, schema: { type: string } }]
+      responses: { '200': { $ref: '#/components/responses/Ok' }, '404': { $ref: '#/components/responses/Problem' } }
+  /bookings/{reference}/documents:
+    get: { tags: [Bookings], operationId: listBookingDocuments, x-phase: 2, security: [{ bearer: [] }], parameters: [{ name: reference, in: path, required: true, schema: { type: string } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /bookings/{reference}/pay-balance:
+    post: { tags: [Bookings], operationId: payBalance, x-phase: 2, security: [{ bearer: [] }], parameters: [{ name: reference, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/IdempotencyKey' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /bookings/{reference}/cancel:
+    post: { tags: [Bookings], operationId: cancelBooking, summary: Returns refund estimate first (dryRun=true) then executes, x-phase: 2, security: [{ bearer: [] }], parameters: [{ name: reference, in: path, required: true, schema: { type: string } }, { name: dryRun, in: query, schema: { type: boolean } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+
+  # ───────── Wishlist ─────────
+  /me/wishlist:
+    get: { tags: [Wishlist], operationId: listWishlist, x-phase: 2, security: [{ bearer: [] }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    post: { tags: [Wishlist], operationId: addToWishlist, summary: Also used to merge guest wishlist on login (array body), x-phase: 2, security: [{ bearer: [] }], responses: { '201': { $ref: '#/components/responses/Ok' } } }
+  /me/wishlist/{id}:
+    delete: { tags: [Wishlist], operationId: removeFromWishlist, x-phase: 2, security: [{ bearer: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '204': { description: Removed } } }
+
+  # ───────── Reviews ─────────
+  /reviews:
+    get: { tags: [Reviews], operationId: listReviews, x-phase: 1, parameters: [{ name: package, in: query, schema: { type: string } }, { name: activity, in: query, schema: { type: string } }, { name: featured, in: query, schema: { type: boolean } }, { $ref: '#/components/parameters/Cursor' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    post: { tags: [Reviews], operationId: createReview, x-phase: 3, security: [{ bearer: [] }], responses: { '201': { $ref: '#/components/responses/Ok' } } }
+  /reviews/summary:
+    get: { tags: [Reviews], operationId: getReviewSummary, summary: Site-wide aggregate rating for trust strip, x-phase: 1, responses: { '200': { $ref: '#/components/responses/Ok' } } }
+
+  # ───────── Leads ─────────
+  /leads:
+    post:
+      tags: [Leads]
+      operationId: createLead
+      summary: Plan-my-trip, package enquiry, MICE, callback. Bot-protected; triggers CRM + (Phase 3) AI draft itinerary.
+      x-phase: 1
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/LeadCreate' } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { type: object, properties: { id: { type: string }, reference: { type: string } } } } } }
+        '422': { $ref: '#/components/responses/Problem' }
+        '429': { $ref: '#/components/responses/Problem' }
+  /quotes/{token}:
+    get: { tags: [Leads], operationId: getPublicQuote, x-phase: 3, parameters: [{ name: token, in: path, required: true, schema: { type: string } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /quotes/{token}/accept:
+    post: { tags: [Leads], operationId: acceptQuote, summary: Converts quote into a cart, x-phase: 3, parameters: [{ name: token, in: path, required: true, schema: { type: string } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /newsletter:
+    post: { tags: [Leads], operationId: subscribeNewsletter, x-phase: 1, responses: { '202': { description: Double opt-in email sent } } }
+  /assistant/messages:
+    post: { tags: [Leads], operationId: assistantMessage, summary: 'AI trip assistant grounded on the catalogue (streamed, SSE)', x-phase: 3, responses: { '200': { description: text/event-stream } } }
+
+  # ───────── Webhooks ─────────
+  /webhooks/razorpay:
+    post: { tags: [Webhooks], operationId: razorpayWebhook, summary: Signature-verified; idempotent on event id, x-phase: 2, responses: { '200': { description: Acknowledged } } }
+  /webhooks/stripe:
+    post: { tags: [Webhooks], operationId: stripeWebhook, x-phase: 2, responses: { '200': { description: Acknowledged } } }
+  /webhooks/whatsapp:
+    post: { tags: [Webhooks], operationId: whatsappWebhook, x-phase: 2, responses: { '200': { description: Acknowledged } } }
+
+  # ───────── Admin (role-gated; listed by resource — full CRUD + bulk import/export each) ─────────
+  /admin/navigation/{key}:
+    put: { tags: [Admin], operationId: adminUpsertNavigation, summary: 'Roles: CONTENT, SUPER_ADMIN. Publishing purges edge cache.', x-phase: 1, security: [{ bearer: [] }], parameters: [{ name: key, in: path, required: true, schema: { type: string } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/pages:
+    get: { tags: [Admin], operationId: adminListPages, x-phase: 1, security: [{ bearer: [] }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    post: { tags: [Admin], operationId: adminCreatePage, x-phase: 1, security: [{ bearer: [] }], responses: { '201': { $ref: '#/components/responses/Ok' } } }
+  /admin/pages/{id}:
+    patch: { tags: [Admin], operationId: adminUpdatePage, x-phase: 1, security: [{ bearer: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/pages/{id}/publish:
+    post: { tags: [Admin], operationId: adminPublishPage, x-phase: 1, security: [{ bearer: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/destinations/{entity}:
+    get: { tags: [Admin], operationId: adminListDestinations, summary: entity = regions | countries | cities, x-phase: 1, security: [{ bearer: [] }], parameters: [{ name: entity, in: path, required: true, schema: { type: string, enum: [regions, countries, cities] } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    post: { tags: [Admin], operationId: adminCreateDestination, x-phase: 1, security: [{ bearer: [] }], parameters: [{ name: entity, in: path, required: true, schema: { type: string, enum: [regions, countries, cities] } }], responses: { '201': { $ref: '#/components/responses/Ok' } } }
+  /admin/destinations/{entity}/{id}:
+    patch: { tags: [Admin], operationId: adminUpdateDestination, summary: Includes advisoryActive / saleEnabled toggle (SUPER_ADMIN only), x-phase: 1, security: [{ bearer: [] }], parameters: [{ name: entity, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/media/stock-search:
+    get: { tags: [Admin], operationId: adminStockSearch, summary: Proxy search across Unsplash + Pexels (keys stay server-side), x-phase: 1, security: [{ bearer: [] }], parameters: [{ name: q, in: query, required: true, schema: { type: string } }, { name: provider, in: query, schema: { type: string, enum: [unsplash, pexels, all] } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/media/import:
+    post: { tags: [Admin], operationId: adminImportStockMedia, summary: 'Download original to S3, store credit + licence, generate blur placeholder', x-phase: 1, security: [{ bearer: [] }], responses: { '201': { $ref: '#/components/responses/Ok' } } }
+  /admin/media:
+    get: { tags: [Admin], operationId: adminListMedia, x-phase: 1, security: [{ bearer: [] }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    post: { tags: [Admin], operationId: adminUploadMedia, summary: Presigned S3 upload, x-phase: 1, security: [{ bearer: [] }], responses: { '201': { $ref: '#/components/responses/Ok' } } }
+  /admin/packages:
+    get: { tags: [Admin], operationId: adminListPackages, x-phase: 1, security: [{ bearer: [] }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+    post: { tags: [Admin], operationId: adminCreatePackage, x-phase: 1, security: [{ bearer: [] }], responses: { '201': { $ref: '#/components/responses/Ok' } } }
+  /admin/packages/{id}:
+    patch: { tags: [Admin], operationId: adminUpdatePackage, x-phase: 1, security: [{ bearer: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/imports:
+    post: { tags: [Admin], operationId: adminBulkImport, summary: 'CSV import (packages, departures, prices) → async job', x-phase: 2, security: [{ bearer: [] }], responses: { '202': { $ref: '#/components/responses/Ok' } } }
+  /admin/bookings:
+    get: { tags: [Admin], operationId: adminListBookings, x-phase: 2, security: [{ bearer: [] }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/leads:
+    get: { tags: [Admin], operationId: adminListLeads, x-phase: 1, security: [{ bearer: [] }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/leads/{id}:
+    patch: { tags: [Admin], operationId: adminUpdateLead, x-phase: 1, security: [{ bearer: [] }], parameters: [{ $ref: '#/components/parameters/Id' }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/users:
+    get: { tags: [Admin], operationId: adminListUsers, x-phase: 1, security: [{ bearer: [] }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/audit-log:
+    get: { tags: [Admin], operationId: adminListAuditLog, x-phase: 1, security: [{ bearer: [] }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+  /admin/feature-flags/{key}:
+    put: { tags: [Admin], operationId: adminSetFeatureFlag, x-phase: 1, security: [{ bearer: [] }], parameters: [{ name: key, in: path, required: true, schema: { type: string } }], responses: { '200': { $ref: '#/components/responses/Ok' } } }
+
+components:
+  securitySchemes:
+    bearer: { type: http, scheme: bearer, bearerFormat: JWT }
+
+  parameters:
+    Id: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    Slug: { name: slug, in: path, required: true, schema: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' } }
+    Cursor: { name: cursor, in: query, schema: { type: string } }
+    Limit: { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+    IdempotencyKey: { name: Idempotency-Key, in: header, required: true, schema: { type: string, maxLength: 64 } }
+
+  requestBodies:
+    Register:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email, password, firstName, consents]
+            properties:
+              email: { type: string, format: email }
+              password: { type: string, minLength: 10 }
+              firstName: { type: string }
+              lastName: { type: string }
+              referralCode: { type: string }
+              consents: { type: object, additionalProperties: { type: boolean } }
+
+  responses:
+    Ok:
+      description: OK (body schema defined when the owning squad implements the endpoint)
+      content: { application/json: { schema: { type: object } } }
+    TokenPair:
+      description: Authenticated
+      content: { application/json: { schema: { $ref: '#/components/schemas/TokenPair' } } }
+    Problem:
+      description: Error (RFC 9457)
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+
+  schemas:
+    Platform: { type: string, enum: [web, ios, android] }
+    HotelTier: { type: string, enum: [STANDARD, DELUXE, PREMIUM, LUXURY] }
+    PublishStatus: { type: string, enum: [DRAFT, IN_REVIEW, PUBLISHED, ARCHIVED] }
+
+    Money:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount: { type: integer, description: 'Minor units (paise, cents)' }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        formatted: { type: string, example: '₹54,999' }
+
+    Price:
+      type: object
+      description: Display price in the requested currency; chargePrice is what the PSP will actually charge.
+      required: [price]
+      properties:
+        price: { $ref: '#/components/schemas/Money' }
+        compareAt: { $ref: '#/components/schemas/Money' }
+        discountPercent: { type: integer }
+        chargePrice: { $ref: '#/components/schemas/Money' }
+        basis: { type: string, enum: [per_person_twin, per_person, per_group, per_night], default: per_person_twin }
+
+    Image:
+      type: object
+      required: [id, url, alt, width, height]
+      properties:
+        id: { type: string }
+        url: { type: string, format: uri, description: 'CDN template: append ?w=&h=&q=&fm=avif|webp' }
+        alt: { type: string }
+        width: { type: integer }
+        height: { type: integer }
+        blurDataUrl: { type: string }
+        focalPoint: { type: object, properties: { x: { type: number }, y: { type: number } } }
+        credit: { type: object, properties: { name: { type: string }, url: { type: string }, source: { type: string } } }
+
+    Seo:
+      type: object
+      properties:
+        title: { type: string }
+        description: { type: string }
+        canonical: { type: string }
+        noindex: { type: boolean }
+        jsonLd: { type: array, items: { type: object }, description: Pre-built structured data blocks }
+        breadcrumbs: { type: array, items: { type: object, properties: { name: { type: string }, path: { type: string } } } }
+
+    PageInfo:
+      type: object
+      required: [hasMore]
+      properties:
+        nextCursor: { type: [string, 'null'] }
+        hasMore: { type: boolean }
+        total: { type: integer }
+
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code: { type: string, description: 'Stable machine code, e.g. SEATS_UNAVAILABLE' }
+        errors: { type: array, items: { type: object, properties: { path: { type: string }, message: { type: string } } } }
+
+    TokenPair:
+      type: object
+      required: [accessToken, refreshToken, expiresIn, user]
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresIn: { type: integer }
+        user: { $ref: '#/components/schemas/User' }
+
+    User:
+      type: object
+      required: [id, roles]
+      properties:
+        id: { type: string }
+        email: { type: [string, 'null'] }
+        phoneMasked: { type: [string, 'null'], example: '+91 •••••• 4321' }
+        firstName: { type: [string, 'null'] }
+        lastName: { type: [string, 'null'] }
+        avatar: { $ref: '#/components/schemas/Image' }
+        roles: { type: array, items: { type: string } }
+        preferredLocale: { type: string }
+        preferredCurrency: { type: string }
+        loyaltyPoints: { type: integer }
+        referralCode: { type: string }
+
+    AppConfig:
+      type: object
+      properties:
+        flags: { type: object, additionalProperties: true }
+        currencies: { type: array, items: { type: string }, example: [INR, USD, AED, SGD, EUR, GBP] }
+        locales: { type: array, items: { type: string } }
+        support: { type: object, properties: { phone: { type: string }, whatsapp: { type: string } } }
+        minSupportedAppVersion: { type: string }
+        paymentProviders: { type: array, items: { type: string } }
+
+    NavLink:
+      type: object
+      required: [label, href]
+      properties:
+        label: { type: string }
+        href: { type: string }
+        icon: { type: string, description: Icon key or ISO-2 flag code }
+        badge: { type: string, enum: [new, hot] }
+        fromPrice: { $ref: '#/components/schemas/Money' }
+
+    NavigationMenu:
+      type: object
+      required: [key, items, version]
+      properties:
+        key: { type: string }
+        version: { type: integer }
+        items:
+          type: array
+          items:
+            type: object
+            required: [id, label]
+            properties:
+              id: { type: string }
+              label: { type: string }
+              href: { type: string }
+              panel:
+                type: object
+                properties:
+                  columns:
+                    type: array
+                    maxItems: 3
+                    items:
+                      type: object
+                      properties:
+                        heading: { type: string }
+                        links: { type: array, items: { $ref: '#/components/schemas/NavLink' } }
+                  promo:
+                    type: object
+                    properties:
+                      kind: { type: string, enum: [card, carousel, countdown] }
+                      title: { type: string }
+                      image: { $ref: '#/components/schemas/Image' }
+                      href: { type: string }
+                      fromPrice: { $ref: '#/components/schemas/Money' }
+                      countdownTo: { type: string, format: date-time }
+                      items: { type: array, items: { $ref: '#/components/schemas/PackageCard' } }
+
+    Page:
+      type: object
+      required: [slug, title, blocks]
+      properties:
+        slug: { type: string }
+        title: { type: string }
+        seo: { $ref: '#/components/schemas/Seo' }
+        blocks:
+          type: array
+          items:
+            type: object
+            required: [id, type, props]
+            properties:
+              id: { type: string }
+              type:
+                type: string
+                enum: [hero, regionTiles, trendingDestinations, packageGrid, themeChips, dealsBanner, activityCards, valueProps, planMyTrip, seasonalPicks, reviews, blogTeasers, partnerLogos, newsletterAppDownload, richText, faq, imageText, cta]
+              props: { type: object, description: 'Shape per block type: see packages/validation/blocks/*.ts' }
+
+    RegionSummary:
+      type: object
+      required: [slug, name, image]
+      properties:
+        slug: { type: string }
+        name: { type: string }
+        tagline: { type: string }
+        image: { $ref: '#/components/schemas/Image' }
+        countryCount: { type: integer }
+        fromPrice: { $ref: '#/components/schemas/Price' }
+
+    Region:
+      allOf:
+        - { $ref: '#/components/schemas/RegionSummary' }
+        - type: object
+          properties:
+            description: { type: string }
+            countries: { type: array, items: { $ref: '#/components/schemas/CountrySummary' } }
+            seo: { $ref: '#/components/schemas/Seo' }
+
+    CountrySummary:
+      type: object
+      required: [slug, name, image]
+      properties:
+        slug: { type: string }
+        iso2: { type: string }
+        name: { type: string }
+        image: { $ref: '#/components/schemas/Image' }
+        packageCount: { type: integer }
+        fromPrice: { $ref: '#/components/schemas/Price' }
+
+    Country:
+      allOf:
+        - { $ref: '#/components/schemas/CountrySummary' }
+        - type: object
+          properties:
+            region: { $ref: '#/components/schemas/RegionSummary' }
+            overview: { type: string }
+            bestMonths: { type: array, items: { type: integer } }
+            facts: { type: object }
+            visa: { type: object }
+            topCities: { type: array, items: { type: object } }
+            featuredPackages: { type: array, items: { $ref: '#/components/schemas/PackageCard' } }
+            topActivities: { type: array, items: { type: object } }
+            faqs: { type: array, items: { type: object, properties: { q: { type: string }, a: { type: string } } } }
+            gallery: { type: array, items: { $ref: '#/components/schemas/Image' } }
+            seo: { $ref: '#/components/schemas/Seo' }
+
+    PackageCard:
+      type: object
+      required: [slug, title, nights, days, images, price]
+      properties:
+        slug: { type: string }
+        title: { type: string }
+        nights: { type: integer }
+        days: { type: integer }
+        route: { type: array, items: { type: object, properties: { city: { type: string }, nights: { type: integer } } } }
+        images: { type: array, maxItems: 5, items: { $ref: '#/components/schemas/Image' } }
+        inclusionIcons: { type: array, items: { type: string, enum: [hotel, meals, transfers, sightseeing, flights_optional, visa] } }
+        rating: { type: object, properties: { average: { type: number }, count: { type: integer } } }
+        price: { $ref: '#/components/schemas/Price' }
+        badges: { type: array, items: { type: string, enum: [best_seller, trending, new, hot, deal] } }
+        themes: { type: array, items: { type: string } }
+        bookedThisWeek: { type: integer }
+
+    PackageDetail:
+      allOf:
+        - { $ref: '#/components/schemas/PackageCard' }
+        - type: object
+          properties:
+            type: { type: string, enum: [FIXED_DEPARTURE, CUSTOMISABLE, PRIVATE, GROUP_TOUR] }
+            summary: { type: string }
+            highlights: { type: array, items: { type: string } }
+            itinerary: { type: array, items: { type: object } }
+            inclusions: { type: array, items: { type: string } }
+            exclusions: { type: array, items: { type: string } }
+            hotelOptions: { type: array, items: { type: object } }
+            addOns: { type: array, items: { type: object } }
+            policies: { type: object }
+            faqs: { type: array, items: { type: object } }
+            mapRoute: { type: array, items: { type: object } }
+            seo: { $ref: '#/components/schemas/Seo' }
+
+    Facets:
+      type: object
+      additionalProperties:
+        type: array
+        items: { type: object, properties: { value: { type: string }, label: { type: string }, count: { type: integer } } }
+
+    SearchSuggestions:
+      type: object
+      properties:
+        destinations: { type: array, items: { type: object, properties: { kind: { type: string, enum: [region, country, city] }, slug: { type: string }, name: { type: string }, context: { type: string } } } }
+        packages: { type: array, items: { $ref: '#/components/schemas/PackageCard' } }
+        activities: { type: array, items: { type: object } }
+
+    LeadCreate:
+      type: object
+      required: [type, name, consent]
+      properties:
+        type: { type: string, enum: [PLAN_MY_TRIP, PACKAGE_ENQUIRY, MICE_CORPORATE, MICE_SCHOOL, CALLBACK] }
+        name: { type: string }
+        email: { type: string, format: email }
+        phone: { type: string }
+        destination: { type: string }
+        packageSlug: { type: string }
+        travelMonth: { type: string, pattern: '^[0-9]{4}-[0-9]{2}$' }
+        nights: { type: integer }
+        adults: { type: integer, default: 2 }
+        children: { type: integer, default: 0 }
+        budget: { $ref: '#/components/schemas/Money' }
+        departureCity: { type: string }
+        company: { type: string }
+        groupSize: { type: integer }
+        notes: { type: string, maxLength: 2000 }
+        consent: { type: boolean, const: true }
+        captchaToken: { type: string }
+        utm: { type: object }

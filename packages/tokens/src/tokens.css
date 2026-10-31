@@ -1,0 +1,97 @@
+/* AsiaVoyage design tokens — generated from tokens.json (do not edit by hand once the build script lands). */
+:root {
+  /* Brand */
+  --brand-primary: #0F6B5C;
+  --brand-primary-600: #13806E;
+  --brand-primary-800: #0B5247;
+  /* RGB channels so Tailwind opacity modifiers (bg-surface/95, from-ink-900/80) work */
+  --brand-primary-rgb: 15 107 92;
+  --brand-primary-800-rgb: 11 82 71;
+  --brand-primary-50: #E8F5F1;
+  --brand-accent: #F26B3A;      /* decorative / large text only (white on it = 3.03:1) */
+  --brand-accent-600: #D9562A;
+  --brand-accent-700: #C4471B;  /* CTA fill, white label 4.92:1 */
+  --brand-accent-800: #A93C17;  /* CTA hover */
+  --cta-label: #FFFFFF;
+  --brand-accent-text: #C2410C; /* price highlights on light surfaces */
+  --brand-gold: #E8B84A;        /* fills only; text on it = ink-900 */
+
+  /* Ink */
+  --ink-900: #111827;
+  --ink-900-rgb: 17 24 39;
+  --ink-600: #4B5563;
+  --ink-500: #6B7280;           /* captions, strikethrough */
+  --ink-400: #9CA3AF;           /* disabled / decorative only */
+
+  /* Surfaces & lines */
+  --surface: #FFFFFF;
+  --surface-rgb: 255 255 255;
+  --surface-warm: #FBF8F3;
+  --surface-overlay: rgba(17, 24, 39, 0.55);
+  --hero-gradient: radial-gradient(ellipse 80% 50% at 50% 55%, rgba(17,24,39,.42) 0%, rgba(17,24,39,.24) 60%, rgba(17,24,39,0) 100%), linear-gradient(180deg, rgba(17,24,39,.45) 0%, rgba(17,24,39,.10) 40%, rgba(17,24,39,.65) 100%);
+  --line: #ECE7DF;
+  --line-strong: #8C857A;
+
+  /* Feedback */
+  --success: #16A34A;
+  --success-text: #15803D;
+  --success-bg: #F0FDF4;
+  --danger: #DC2626;
+  --danger-bg: #FEF2F2;
+  --focus-ring: #0F6B5C;
+
+  /* Type */
+  --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-body: 'Plus Jakarta Sans', Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --text-display: clamp(2.25rem, 1.5rem + 3.2vw, 3.5rem);
+  --text-h1: clamp(1.875rem, 1.4rem + 2vw, 2.75rem);
+  --text-h2: clamp(1.5rem, 1.2rem + 1.3vw, 2rem);
+  --text-h3: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem);
+  --text-h4: clamp(1.125rem, 1.05rem + 0.3vw, 1.25rem);
+  --text-body: 1rem;
+  --text-small: 0.875rem;
+  --text-micro: 0.75rem;
+
+  /* Shape, depth, layout */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-card: 16px;
+  --radius-pill: 999px;
+  --shadow-card: 0 8px 24px rgba(17, 24, 39, 0.08);
+  --shadow-card-hover: 0 12px 32px rgba(17, 24, 39, 0.12);
+  --shadow-header: 0 2px 12px rgba(17, 24, 39, 0.06);
+  --shadow-panel: 0 24px 48px rgba(17, 24, 39, 0.12);
+  --container-max: 80rem;
+  --megamenu-max: 75rem;
+  --header-utility-h: 2.3125rem;
+  --header-h: 5rem;
+  --header-sticky-h: 4rem;
+
+  /* Motion */
+  --dur-menu-intent: 120ms;
+  --dur-menu-close: 250ms;
+  --dur-menu-swap: 150ms;
+  --dur-underline: 200ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-menu-intent: 0ms; --dur-menu-swap: 0ms; --dur-underline: 0ms; }
+}
+
+/* Dark set — defined now, enabled later via [data-theme="dark"] behind flag theme.dark */
+:root[data-theme="dark"] {
+  --brand-primary: #4FC3A9;
+  --brand-primary-rgb: 79 195 169;
+  --brand-accent-700: #F2804F;
+  --cta-label: #111827;
+  --ink-900: #F5F3EF;
+  --ink-900-rgb: 245 243 239;
+  --ink-600: #C9CDD3;
+  --ink-500: #9EA4AD;
+  --surface: #161B22;
+  --surface-rgb: 22 27 34;
+  --surface-warm: #0F1318;
+  --line: #2A3038;
+}

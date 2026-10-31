@@ -1,0 +1,1522 @@
+// AsiaVoyage — PostgreSQL 16 schema (Prisma)
+//
+// Conventions
+// - IDs: UUIDv7 (time-sortable → stable cursor pagination for web + apps).
+// - Money: BigInt minor units + ISO-4217 currency (Char(3)). Never floats. API serialises as integer.
+// - i18n: base content in EN columns; `translations` Json holds per-locale overrides { "hi": { "title": "…" } }.
+// - Every customer-facing entity has `status` (publish workflow) and SEO fields.
+// - PII that is not needed for lookup is encrypted at the application layer (*Enc Bytes columns, AES-256-GCM via KMS);
+//   values needed for lookup are stored as a keyed hash (*Hash).
+// - Soft delete only where legal retention applies (bookings, payments, invoices); elsewhere hard delete + AuditLog.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum Role {
+  SUPER_ADMIN
+  CONTENT
+  SALES
+  OPS
+  FINANCE
+  SUPPLIER
+  CUSTOMER
+}
+
+enum AuthProvider {
+  PASSWORD
+  OTP_SMS
+  OTP_WHATSAPP
+  GOOGLE
+  APPLE
+}
+
+enum PublishStatus {
+  DRAFT
+  IN_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum PackageType {
+  FIXED_DEPARTURE
+  CUSTOMISABLE
+  PRIVATE
+  GROUP_TOUR
+}
+
+enum AvailabilityMode {
+  FIXED_DEPARTURES // sell only listed Departure rows (seat inventory)
+  DAILY_ON_REQUEST // any start date in season, supplier confirms
+}
+
+enum HotelTier {
+  STANDARD
+  DELUXE
+  PREMIUM
+  LUXURY
+}
+
+enum Occupancy {
+  SINGLE
+  TWIN_SHARING
+  TRIPLE_SHARING
+  CHILD_WITH_BED
+  CHILD_NO_BED
+  INFANT
+}
+
+enum ProductKind {
+  PACKAGE
+  ACTIVITY
+  STAY
+  TRANSFER
+  RAIL_PASS
+  ADD_ON
+}
+
+enum ActivityCategory {
+  TOUR
+  ATTRACTION_TICKET
+  THEME_PARK
+  SHOW
+  WATER_SPORT
+  ADVENTURE
+  FOOD_AND_DRINK
+  WELLNESS
+  CLASS_WORKSHOP
+  CRUISE
+}
+
+enum StayType {
+  HOTEL
+  RESORT
+  VILLA
+  HOMESTAY
+  HOSTEL
+  HOUSEBOAT
+}
+
+enum TransferType {
+  AIRPORT_PICKUP
+  AIRPORT_DROP
+  INTERCITY
+  CAR_WITH_DRIVER_HOURLY
+  CAR_WITH_DRIVER_DAILY
+}
+
+/// FLIGHT exists only as a package add-on; the API rejects FLIGHT add-ons attached to anything but a Package booking item.
+enum AddOnKind {
+  VISA
+  INSURANCE
+  ESIM
+  FOREX
+  FLIGHT
+  MEAL_UPGRADE
+  EXTRA_NIGHT
+  EXPERIENCE
+  OTHER
+}
+
+enum BookingStatus {
+  DRAFT // cart; holds seats until holdExpiresAt
+  PENDING_PAYMENT
+  AWAITING_SUPPLIER // "Request sent, confirmed within 24 h"
+  CONFIRMED
+  PARTIALLY_PAID
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum SupplierConfirmation {
+  NOT_REQUIRED
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+enum PaymentProvider {
+  RAZORPAY
+  STRIPE
+  BANK_TRANSFER
+  MANUAL
+}
+
+enum PaymentPlan {
+  FULL
+  DEPOSIT_25
+  EMI
+}
+
+enum PaymentStatus {
+  CREATED
+  AUTHORISED
+  CAPTURED
+  FAILED
+  CANCELLED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum RefundStatus {
+  REQUESTED
+  APPROVED
+  PROCESSING
+  COMPLETED
+  REJECTED
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUOTED
+  WON
+  LOST
+}
+
+enum LeadType {
+  PLAN_MY_TRIP
+  PACKAGE_ENQUIRY
+  MICE_CORPORATE
+  MICE_SCHOOL
+  CALLBACK
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  VIEWED
+  ACCEPTED
+  EXPIRED
+  DECLINED
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TravellerType {
+  COUPLE
+  FAMILY
+  FRIENDS
+  SOLO
+  BUSINESS
+}
+
+enum PriceRuleKind {
+  SEASONAL
+  EARLY_BIRD
+  LAST_MINUTE
+  GROUP
+  CHANNEL // e.g. app-only price
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+  WEB
+}
+
+enum DataRequestType {
+  EXPORT
+  DELETE
+}
+
+enum DataRequestStatus {
+  RECEIVED
+  PROCESSING
+  COMPLETED
+  REJECTED
+}
+
+enum ContentBlockOwner {
+  PAGE
+  BLOG_POST
+}
+
+// ───────────────────────── Identity & access ─────────────────────────
+
+model User {
+  id               String    @id @default(uuid(7))
+  email            String?   @unique
+  emailVerifiedAt  DateTime?
+  phoneE164Hash    String?   @unique // lookup for OTP login
+  phoneE164Enc     Bytes?
+  phoneVerifiedAt  DateTime?
+  passwordHash     String? // Argon2id
+  firstName        String?
+  lastName         String?
+  avatarMediaId    String?
+  roles            Role[]    @default([CUSTOMER])
+  totpSecretEnc    Bytes? // 2FA, mandatory for any non-CUSTOMER role
+  preferredLocale  String    @default("en")
+  preferredCurrency String   @default("INR") @db.Char(3)
+  homeCity         String? // drives "packages from Delhi" defaults
+  supplierId       String? // set for SUPPLIER role users
+  loyaltyPoints    Int       @default(0)
+  referralCode     String    @unique
+  referredById     String?
+  lastLoginAt      DateTime?
+  deletedAt        DateTime? // DPDP/GDPR erasure: row anonymised, kept for booking FK integrity
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  avatar        Media?             @relation("UserAvatar", fields: [avatarMediaId], references: [id], onDelete: SetNull)
+  supplier      Supplier?          @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  referredBy    User?              @relation("Referral", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals     User[]             @relation("Referral")
+  identities    AuthIdentity[]
+  sessions      Session[]
+  devices       Device[]
+  consents      Consent[]
+  dataRequests  DataRequest[]
+  travellers    SavedTraveller[]
+  wishlistItems WishlistItem[]
+  bookings      Booking[]
+  reviews       Review[]
+  leadsAssigned Lead[]             @relation("LeadAssignee")
+  leadsOwned    Lead[]             @relation("LeadCustomer")
+  leadNotes     LeadActivity[]
+  quotes        Quote[]
+  auditLogs     AuditLog[]
+  loyaltyLedger LoyaltyLedgerEntry[]
+  blogPosts     BlogPost[]
+  revisions     ContentRevision[]
+  uploadedMedia Media[]            @relation("MediaUploader")
+
+  @@index([roles])
+}
+
+model AuthIdentity {
+  id             String       @id @default(uuid(7))
+  userId         String
+  provider       AuthProvider
+  providerUserId String // Google/Apple sub, or phone hash for OTP
+  createdAt      DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+}
+
+/// Refresh-token family (rotation with reuse detection). Access tokens are stateless JWTs (15 min).
+model Session {
+  id               String         @id @default(uuid(7))
+  userId           String
+  refreshTokenHash String         @unique
+  familyId         String
+  deviceId         String?
+  platform         DevicePlatform
+  ip               String?
+  userAgent        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+}
+
+/// Push-notification registry (FCM / APNs / web push).
+model Device {
+  id         String         @id @default(uuid(7))
+  userId     String?
+  platform   DevicePlatform
+  pushToken  String         @unique
+  appVersion String?
+  locale     String?
+  lastSeenAt DateTime       @default(now())
+  createdAt  DateTime       @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+}
+
+/// DPDP Act 2023 / GDPR consent ledger (append-only).
+model Consent {
+  id        String   @id @default(uuid(7))
+  userId    String?
+  anonId    String? // pre-login cookie id
+  purpose   String // "marketing_email" | "whatsapp_updates" | "analytics" | ...
+  granted   Boolean
+  noticeVersion String
+  ip        String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, purpose])
+}
+
+model DataRequest {
+  id          String            @id @default(uuid(7))
+  userId      String
+  type        DataRequestType
+  status      DataRequestStatus @default(RECEIVED)
+  exportUrl   String?
+  completedAt DateTime?
+  createdAt   DateTime          @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+model SavedTraveller {
+  id                String    @id @default(uuid(7))
+  userId            String
+  firstName         String
+  lastName          String
+  dateOfBirth       DateTime? @db.Date
+  gender            String?
+  nationality       String?   @db.Char(2)
+  passportNumberEnc Bytes?
+  passportExpiry    DateTime? @db.Date
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ───────────────────────────── Geography ─────────────────────────────
+
+model Region {
+  id             String        @id @default(uuid(7))
+  slug           String        @unique // south-east-asia
+  name           String
+  tagline        String?
+  description    String?
+  heroMediaId    String?
+  position       Int           @default(0)
+  status         PublishStatus @default(DRAFT)
+  translations   Json?
+  seoTitle       String?
+  seoDescription String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  heroMedia Media?    @relation("RegionHero", fields: [heroMediaId], references: [id], onDelete: SetNull)
+  countries Country[]
+}
+
+model Country {
+  id              String        @id @default(uuid(7))
+  regionId        String
+  iso2            String        @unique @db.Char(2)
+  slug            String        @unique // thailand
+  name            String
+  currency        String        @db.Char(3)
+  overview        String?
+  bestMonths      Int[] // 1–12; powers "Where to go in <month>"
+  shoulderMonths  Int[]
+  visaInfo        Json? // { summary, onArrival, eVisaUrl, processingDays, feeMinor, feeCurrency }
+  facts           Json? // { language, timezone, plugType, capital }
+  faqs            Json? // [{ q, a }] → FAQPage JSON-LD
+  heroMediaId     String?
+  /// Travel advisory: when true, every product in this country is hidden from sale until saleEnabled is set by an admin.
+  advisoryActive  Boolean       @default(false)
+  advisoryNote    String?
+  saleEnabled     Boolean       @default(true)
+  isLaunchPriority Boolean      @default(false)
+  position        Int           @default(0)
+  status          PublishStatus @default(DRAFT)
+  translations    Json?
+  seoTitle        String?
+  seoDescription  String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  region     Region        @relation(fields: [regionId], references: [id], onDelete: Restrict)
+  heroMedia  Media?        @relation("CountryHero", fields: [heroMediaId], references: [id], onDelete: SetNull)
+  cities     City[]
+  packages   PackageCountry[]
+  gallery    GalleryItem[]
+
+  @@index([regionId, status])
+}
+
+model City {
+  id             String        @id @default(uuid(7))
+  countryId      String
+  slug           String        @unique // phuket
+  name           String
+  kind           String        @default("city") // city | island | area | park
+  overview       String?
+  latitude       Float?
+  longitude      Float?
+  iataCode       String?       @db.Char(3) // airport transfers only
+  bestMonths     Int[]
+  heroMediaId    String?
+  isDepartureHub Boolean       @default(false) // Delhi, Mumbai… for "packages from <city>"
+  position       Int           @default(0)
+  status         PublishStatus @default(DRAFT)
+  translations   Json?
+  seoTitle       String?
+  seoDescription String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  country    Country       @relation(fields: [countryId], references: [id], onDelete: Restrict)
+  heroMedia  Media?        @relation("CityHero", fields: [heroMediaId], references: [id], onDelete: SetNull)
+  routeStops PackageStop[]
+  activities Activity[]
+  stays      Stay[]
+  transfers  Transfer[]
+  gallery    GalleryItem[]
+
+  @@index([countryId, status])
+}
+
+// ───────────────────────────── Catalogue ─────────────────────────────
+
+model Theme {
+  id          String        @id @default(uuid(7))
+  slug        String        @unique // honeymoon, family, adventure…
+  name        String
+  icon        String? // icon key in @asiavoyage/ui
+  description String?
+  mediaId     String?
+  position    Int           @default(0)
+  status      PublishStatus @default(PUBLISHED)
+  translations Json?
+
+  media      Media?     @relation("ThemeMedia", fields: [mediaId], references: [id], onDelete: SetNull)
+  packages   Package[]
+  activities Activity[]
+}
+
+model Supplier {
+  id               String   @id @default(uuid(7))
+  name             String
+  legalName        String?
+  countryIso2      String?  @db.Char(2)
+  email            String
+  phone            String?
+  confirmSlaHours  Int      @default(24)
+  commissionBps    Int      @default(0) // basis points
+  payoutDetailsEnc Bytes?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  users        User[]
+  packages     Package[]
+  activities   Activity[]
+  stays        Stay[]
+  transfers    Transfer[]
+  bookingItems BookingItem[]
+}
+
+model Package {
+  id               String           @id @default(uuid(7))
+  slug             String           @unique
+  code             String           @unique // internal SKU, e.g. TH-PHK-KRB-6D
+  title            String
+  subtitle         String?
+  type             PackageType
+  availabilityMode AvailabilityMode @default(FIXED_DEPARTURES)
+  nights           Int
+  days             Int
+  summary          String?
+  highlights       String[]
+  inclusions       String[] // icon-keyed: "hotel","meals:breakfast","transfers","sightseeing","flights:optional"
+  exclusions       String[]
+  inclusionFlags   String[] // normalised facet values for filters/icons
+  policies         Json? // { cancellation: [...], payment: {...}, childPolicy, terms }
+  faqs             Json?
+  departureCities  String[] // city slugs, e.g. ["delhi","mumbai"]; empty = land-only
+  hasOptionalFlights Boolean        @default(false)
+  minPax           Int              @default(1)
+  maxPax           Int?
+  /// Denormalised "from" price per person (twin sharing, cheapest tier) — recomputed by pricing job; drives listings/sort.
+  fromAmount       BigInt?
+  fromCompareAt    BigInt?
+  currency         String           @default("INR") @db.Char(3)
+  ratingAvg        Decimal?         @db.Decimal(2, 1)
+  ratingCount      Int              @default(0)
+  bookedLast7d     Int              @default(0) // social proof, recomputed nightly
+  isBestSeller     Boolean          @default(false)
+  isTrending       Boolean          @default(false)
+  badge            String? // "New" | "Hot" | custom
+  heroMediaId      String?
+  supplierId       String?
+  status           PublishStatus    @default(DRAFT)
+  publishedAt      DateTime?
+  translations     Json?
+  seoTitle         String?
+  seoDescription   String?
+  canonicalPath    String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  heroMedia     Media?               @relation("PackageHero", fields: [heroMediaId], references: [id], onDelete: SetNull)
+  supplier      Supplier?            @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  themes        Theme[]
+  countries     PackageCountry[]
+  stops         PackageStop[]
+  itinerary     ItineraryDay[]
+  hotelOptions  PackageHotelOption[]
+  departures    Departure[]
+  addOns        PackageAddOn[]
+  priceRules    PriceRule[]
+  gallery       GalleryItem[]
+  reviews       Review[]
+  wishlistItems WishlistItem[]
+  bookingItems  BookingItem[]
+
+  @@index([status, fromAmount])
+  @@index([status, nights])
+  @@index([isBestSeller, status])
+}
+
+model PackageCountry {
+  packageId String
+  countryId String
+  isPrimary Boolean @default(false)
+
+  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  country Country @relation(fields: [countryId], references: [id], onDelete: Restrict)
+
+  @@id([packageId, countryId])
+  @@index([countryId])
+}
+
+/// Ordered route: Phuket (3N) → Krabi (2N)
+model PackageStop {
+  id        String @id @default(uuid(7))
+  packageId String
+  cityId    String
+  position  Int
+  nights    Int
+
+  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  city    City    @relation(fields: [cityId], references: [id], onDelete: Restrict)
+
+  @@unique([packageId, position])
+  @@index([cityId])
+}
+
+model ItineraryDay {
+  id          String   @id @default(uuid(7))
+  packageId   String
+  dayNumber   Int
+  title       String
+  description String
+  meals       String[] // breakfast | lunch | dinner
+  overnight   String? // city name
+  activities  String[]
+  mapPoints   Json? // [{ lat, lng, label }] → route map
+  translations Json?
+
+  package Package       @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  gallery GalleryItem[]
+
+  @@unique([packageId, dayNumber])
+}
+
+model PackageHotelOption {
+  id        String    @id @default(uuid(7))
+  packageId String
+  tier      HotelTier
+  stopPosition Int // which PackageStop
+  stayId    String?
+  hotelName String // display fallback if not a Stay we sell
+  starRating Int?
+  roomType  String?
+  isDefault Boolean   @default(false)
+
+  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  stay    Stay?   @relation(fields: [stayId], references: [id], onDelete: SetNull)
+
+  @@index([packageId, tier])
+}
+
+model Departure {
+  id          String        @id @default(uuid(7))
+  packageId   String
+  startDate   DateTime      @db.Date
+  endDate     DateTime      @db.Date
+  fromCity    String? // departure city slug when flights are bundled
+  seatsTotal  Int?
+  seatsHeld   Int           @default(0) // carts within hold window
+  seatsSold   Int           @default(0)
+  isGuaranteed Boolean      @default(false)
+  status      PublishStatus @default(PUBLISHED)
+  currency    String        @db.Char(3)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  package      Package          @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  prices       DeparturePrice[]
+  bookingItems BookingItem[]
+
+  @@unique([packageId, startDate, fromCity])
+  @@index([startDate])
+}
+
+model DeparturePrice {
+  id          String    @id @default(uuid(7))
+  departureId String
+  tier        HotelTier
+  occupancy   Occupancy
+  amount      BigInt
+  compareAt   BigInt?
+
+  departure Departure @relation(fields: [departureId], references: [id], onDelete: Cascade)
+
+  @@unique([departureId, tier, occupancy])
+}
+
+model Activity {
+  id                 String           @id @default(uuid(7))
+  slug               String           @unique
+  cityId             String
+  title              String
+  category           ActivityCategory
+  summary            String?
+  description        String?
+  highlights         String[]
+  inclusions         String[]
+  exclusions         String[]
+  durationMinutes    Int?
+  meetingPoint       Json? // { address, lat, lng, notes }
+  instantConfirmation Boolean         @default(false)
+  freeCancellationHours Int? // null = non-refundable
+  languages          String[]
+  fromAmount         BigInt?
+  fromCompareAt      BigInt?
+  currency           String           @default("INR") @db.Char(3)
+  ratingAvg          Decimal?         @db.Decimal(2, 1)
+  ratingCount        Int              @default(0)
+  isBestSeller       Boolean          @default(false)
+  heroMediaId        String?
+  supplierId         String?
+  faqs               Json?
+  status             PublishStatus    @default(DRAFT)
+  translations       Json?
+  seoTitle           String?
+  seoDescription     String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  city          City             @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  heroMedia     Media?           @relation("ActivityHero", fields: [heroMediaId], references: [id], onDelete: SetNull)
+  supplier      Supplier?        @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  themes        Theme[]
+  options       ActivityOption[]
+  gallery       GalleryItem[]
+  reviews       Review[]
+  wishlistItems WishlistItem[]
+
+  @@index([cityId, status, category])
+}
+
+/// e.g. "Phi Phi by speedboat — shared" vs "— private"
+model ActivityOption {
+  id        String  @id @default(uuid(7))
+  activityId String
+  name      String
+  priceTiers Json // [{ label: "Adult", minAge: 12, amount }, { label: "Child", ... }]
+  currency  String  @db.Char(3)
+  isActive  Boolean @default(true)
+
+  activity     Activity       @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  slots        ActivitySlot[]
+  bookingItems BookingItem[]
+}
+
+model ActivitySlot {
+  id        String   @id @default(uuid(7))
+  optionId  String
+  date      DateTime @db.Date
+  startTime String? // "09:30" local time
+  capacity  Int?
+  sold      Int      @default(0)
+
+  option ActivityOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@unique([optionId, date, startTime])
+}
+
+model Stay {
+  id            String        @id @default(uuid(7))
+  slug          String        @unique
+  cityId        String
+  name          String
+  type          StayType
+  starRating    Int?
+  summary       String?
+  description   String?
+  amenities     String[]
+  address       String?
+  latitude      Float?
+  longitude     Float?
+  checkInTime   String?
+  checkOutTime  String?
+  fromAmount    BigInt?
+  currency      String        @default("INR") @db.Char(3)
+  ratingAvg     Decimal?      @db.Decimal(2, 1)
+  ratingCount   Int           @default(0)
+  heroMediaId   String?
+  supplierId    String?
+  status        PublishStatus @default(DRAFT)
+  translations  Json?
+  seoTitle      String?
+  seoDescription String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  city          City                 @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  heroMedia     Media?               @relation("StayHero", fields: [heroMediaId], references: [id], onDelete: SetNull)
+  supplier      Supplier?            @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  roomTypes     RoomType[]
+  packageUses   PackageHotelOption[]
+  gallery       GalleryItem[]
+  reviews       Review[]
+  wishlistItems WishlistItem[]
+
+  @@index([cityId, status])
+}
+
+model RoomType {
+  id          String  @id @default(uuid(7))
+  stayId      String
+  name        String
+  maxOccupancy Int
+  bedType     String?
+  mealPlan    String? // EP | CP | MAP | AP
+  baseAmount  BigInt // per night; rate calendar from supplier sync in Phase 2
+  currency    String  @db.Char(3)
+  isActive    Boolean @default(true)
+
+  stay         Stay          @relation(fields: [stayId], references: [id], onDelete: Cascade)
+  bookingItems BookingItem[]
+}
+
+model Transfer {
+  id           String       @id @default(uuid(7))
+  slug         String       @unique
+  cityId       String
+  type         TransferType
+  title        String
+  vehicleClass String // sedan | suv | van | coach
+  maxPax       Int
+  maxBags      Int?
+  fromLabel    String?
+  toLabel      String?
+  amount       BigInt
+  currency     String       @db.Char(3)
+  supplierId   String?
+  status       PublishStatus @default(DRAFT)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  city         City          @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  supplier     Supplier?     @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  bookingItems BookingItem[]
+
+  @@index([cityId, type])
+}
+
+model AddOn {
+  id          String    @id @default(uuid(7))
+  kind        AddOnKind
+  name        String
+  description String?
+  countryIso2 String?   @db.Char(2) // visa / eSIM scope
+  amount      BigInt
+  currency    String    @db.Char(3)
+  perPerson   Boolean   @default(true)
+  isActive    Boolean   @default(true)
+
+  packages     PackageAddOn[]
+  bookingItems BookingItem[]
+}
+
+model PackageAddOn {
+  packageId String
+  addOnId   String
+  isDefault Boolean @default(false)
+
+  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  addOn   AddOn   @relation(fields: [addOnId], references: [id], onDelete: Cascade)
+
+  @@id([packageId, addOnId])
+}
+
+// ───────────────────────────── Pricing ─────────────────────────────
+
+model PriceRule {
+  id           String        @id @default(uuid(7))
+  name         String
+  kind         PriceRuleKind
+  discountType DiscountType
+  value        Int // percent × 100 (bps) or minor units
+  currency     String?       @db.Char(3)
+  packageId    String? // null = global/scope filter
+  scope        Json? // { countryIds, themeSlugs, productKinds }
+  travelFrom   DateTime?     @db.Date
+  travelTo     DateTime?     @db.Date
+  bookFrom     DateTime?
+  bookTo       DateTime?
+  minDaysBeforeTravel Int?
+  maxDaysBeforeTravel Int?
+  minPax       Int?
+  priority     Int           @default(0)
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+
+  package Package? @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@index([isActive, kind])
+}
+
+model Coupon {
+  id              String       @id @default(uuid(7))
+  code            String       @unique
+  description     String?
+  discountType    DiscountType
+  value           Int
+  currency        String?      @db.Char(3)
+  maxDiscount     BigInt?
+  minOrderAmount  BigInt?
+  scope           Json?
+  validFrom       DateTime
+  validTo         DateTime
+  usageLimit      Int?
+  perUserLimit    Int          @default(1)
+  usedCount       Int          @default(0)
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+
+  redemptions CouponRedemption[]
+}
+
+model CouponRedemption {
+  id        String   @id @default(uuid(7))
+  couponId  String
+  bookingId String   @unique
+  userId    String?
+  amount    BigInt
+  createdAt DateTime @default(now())
+
+  coupon  Coupon  @relation(fields: [couponId], references: [id], onDelete: Restrict)
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([couponId, userId])
+}
+
+/// Daily FX snapshot. Base INR; display prices converted at read time and rounded per currency rules.
+model FxRate {
+  id        String   @id @default(uuid(7))
+  base      String   @db.Char(3)
+  quote     String   @db.Char(3)
+  rate      Decimal  @db.Decimal(18, 8)
+  asOf      DateTime @db.Date
+  source    String
+  createdAt DateTime @default(now())
+
+  @@unique([base, quote, asOf])
+}
+
+// ───────────────────────────── Bookings & money ─────────────────────────────
+
+model Booking {
+  id               String        @id @default(uuid(7))
+  reference        String        @unique // AV-7K3Q9P (human-friendly, no ambiguous chars)
+  userId           String?
+  status           BookingStatus @default(DRAFT)
+  channel          String        @default("web") // web | ios | android | admin | partner
+  contactName      String
+  contactEmail     String
+  contactPhoneEnc  Bytes?
+  currency         String        @db.Char(3) // charge currency
+  displayCurrency  String        @db.Char(3)
+  fxRateUsed       Decimal?      @db.Decimal(18, 8)
+  subtotalAmount   BigInt
+  discountAmount   BigInt        @default(0)
+  taxAmount        BigInt        @default(0) // GST / TCS
+  totalAmount      BigInt
+  paidAmount       BigInt        @default(0)
+  paymentPlan      PaymentPlan   @default(FULL)
+  balanceDueAt     DateTime?
+  holdExpiresAt    DateTime?
+  travelStartDate  DateTime?     @db.Date
+  specialRequests  String?
+  idempotencyKey   String?       @unique
+  utm              Json?
+  cancelledAt      DateTime?
+  cancellationReason String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  user       User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items      BookingItem[]
+  travellers BookingTraveller[]
+  payments   Payment[]
+  refunds    Refund[]
+  invoices   Invoice[]
+  documents  BookingDocument[]
+  events     BookingEvent[]
+  coupon     CouponRedemption?
+  reviews    Review[]
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@index([travelStartDate])
+}
+
+/// One line per sold product. `snapshot` freezes title/itinerary/policy at purchase so later catalogue edits never alter a sold booking.
+model BookingItem {
+  id                   String               @id @default(uuid(7))
+  bookingId            String
+  kind                 ProductKind
+  packageId            String?
+  departureId          String?
+  hotelTier            HotelTier?
+  activityOptionId     String?
+  activitySlotDate     DateTime?            @db.Date
+  roomTypeId           String?
+  transferId           String?
+  addOnId              String?
+  parentItemId         String? // add-ons (incl. FLIGHT) hang off a PACKAGE item
+  startDate            DateTime?            @db.Date
+  endDate              DateTime?            @db.Date
+  quantity             Int                  @default(1)
+  paxBreakdown         Json? // { TWIN_SHARING: 2, CHILD_NO_BED: 1 }
+  unitAmount           BigInt
+  totalAmount          BigInt
+  currency             String               @db.Char(3)
+  supplierId           String?
+  supplierConfirmation SupplierConfirmation @default(NOT_REQUIRED)
+  supplierRef          String?
+  confirmBy            DateTime?
+  snapshot             Json
+  createdAt            DateTime             @default(now())
+
+  booking        Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  package        Package?        @relation(fields: [packageId], references: [id], onDelete: Restrict)
+  departure      Departure?      @relation(fields: [departureId], references: [id], onDelete: Restrict)
+  activityOption ActivityOption? @relation(fields: [activityOptionId], references: [id], onDelete: Restrict)
+  roomType       RoomType?       @relation(fields: [roomTypeId], references: [id], onDelete: Restrict)
+  transfer       Transfer?       @relation(fields: [transferId], references: [id], onDelete: Restrict)
+  addOn          AddOn?          @relation(fields: [addOnId], references: [id], onDelete: Restrict)
+  supplier       Supplier?       @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  parentItem     BookingItem?    @relation("ItemAddOns", fields: [parentItemId], references: [id], onDelete: Cascade)
+  childItems     BookingItem[]   @relation("ItemAddOns")
+
+  @@index([bookingId])
+  @@index([supplierId, supplierConfirmation])
+  @@index([departureId])
+}
+
+model BookingTraveller {
+  id                String    @id @default(uuid(7))
+  bookingId         String
+  isLead            Boolean   @default(false)
+  firstName         String
+  lastName          String
+  dateOfBirth       DateTime? @db.Date
+  gender            String?
+  nationality       String?   @db.Char(2)
+  passportNumberEnc Bytes?
+  passportExpiry    DateTime? @db.Date
+  occupancy         Occupancy?
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+}
+
+model Payment {
+  id                String          @id @default(uuid(7))
+  bookingId         String
+  provider          PaymentProvider
+  providerOrderId   String?
+  providerPaymentId String?         @unique
+  method            String? // upi | card | netbanking | emi | apple_pay ...
+  amount            BigInt
+  currency          String          @db.Char(3)
+  status            PaymentStatus   @default(CREATED)
+  installmentNo     Int             @default(1) // deposit = 1, balance = 2
+  dueAt             DateTime?
+  paidAt            DateTime?
+  failureReason     String?
+  raw               Json? // provider webhook payload (no card data — hosted fields only)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  booking Booking  @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  refunds Refund[]
+
+  @@index([bookingId])
+  @@index([providerOrderId])
+}
+
+model Refund {
+  id               String       @id @default(uuid(7))
+  bookingId        String
+  paymentId        String
+  amount           BigInt
+  currency         String       @db.Char(3)
+  reason           String?
+  status           RefundStatus @default(REQUESTED)
+  providerRefundId String?      @unique
+  approvedById     String?
+  processedAt      DateTime?
+  createdAt        DateTime     @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@index([status])
+}
+
+/// GST invoice (immutable once issued; corrections via credit note).
+model Invoice {
+  id          String   @id @default(uuid(7))
+  bookingId   String
+  number      String   @unique
+  isCreditNote Boolean @default(false)
+  gstin       String?
+  placeOfSupply String?
+  lines       Json
+  taxAmount   BigInt
+  totalAmount BigInt
+  currency    String   @db.Char(3)
+  pdfMediaId  String?
+  issuedAt    DateTime @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  pdf     Media?  @relation("InvoicePdf", fields: [pdfMediaId], references: [id], onDelete: SetNull)
+}
+
+model BookingDocument {
+  id        String   @id @default(uuid(7))
+  bookingId String
+  kind      String // voucher | itinerary | visa | insurance | ticket | traveller_upload
+  title     String
+  mediaId   String
+  visibleToCustomer Boolean @default(true)
+  createdAt DateTime @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  media   Media   @relation("BookingDocumentFile", fields: [mediaId], references: [id], onDelete: Restrict)
+
+  @@index([bookingId])
+}
+
+/// Customer-visible + internal timeline (status changes, emails/WhatsApp sent, supplier replies).
+model BookingEvent {
+  id        String   @id @default(uuid(7))
+  bookingId String
+  type      String
+  data      Json?
+  actorId   String?
+  createdAt DateTime @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, createdAt])
+}
+
+// ───────────────────────────── Sales CRM ─────────────────────────────
+
+model Lead {
+  id              String     @id @default(uuid(7))
+  type            LeadType
+  status          LeadStatus @default(NEW)
+  customerId      String?
+  name            String
+  email           String?
+  phoneEnc        Bytes?
+  phoneHash       String? // dedupe
+  destinationText String?
+  countryIds      String[]
+  packageId       String?
+  travelMonth     String? // "2027-02"
+  flexibleDates   Boolean    @default(true)
+  nights          Int?
+  adults          Int        @default(2)
+  children        Int        @default(0)
+  budgetMin       BigInt?
+  budgetMax       BigInt?
+  currency        String     @default("INR") @db.Char(3)
+  departureCity   String?
+  notes           String?
+  company         String? // MICE
+  groupSize       Int? // MICE
+  aiDraft         Json? // AI-generated draft itinerary (Phase 3)
+  assigneeId      String?
+  nextFollowUpAt  DateTime?
+  lostReason      String?
+  source          String     @default("web") // web | ios | android | whatsapp | phone | partner
+  utm             Json?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  customer   User?          @relation("LeadCustomer", fields: [customerId], references: [id], onDelete: SetNull)
+  assignee   User?          @relation("LeadAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  activities LeadActivity[]
+  quotes     Quote[]
+
+  @@index([status, assigneeId])
+  @@index([nextFollowUpAt])
+  @@index([phoneHash])
+}
+
+model LeadActivity {
+  id        String   @id @default(uuid(7))
+  leadId    String
+  authorId  String?
+  kind      String // note | call | email | whatsapp | status_change | reminder
+  body      String?
+  data      Json?
+  createdAt DateTime @default(now())
+
+  lead   Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([leadId, createdAt])
+}
+
+model Quote {
+  id          String      @id @default(uuid(7))
+  leadId      String
+  version     Int         @default(1)
+  status      QuoteStatus @default(DRAFT)
+  title       String
+  itinerary   Json // same shape as ItineraryDay[] + hotel picks
+  lines       Json
+  totalAmount BigInt
+  currency    String      @db.Char(3)
+  validUntil  DateTime?
+  pdfMediaId  String?
+  publicToken String      @unique // customer view / accept link
+  createdById String
+  sentAt      DateTime?
+  viewedAt    DateTime?
+  createdAt   DateTime    @default(now())
+
+  lead      Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdBy User   @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  pdf       Media? @relation("QuotePdf", fields: [pdfMediaId], references: [id], onDelete: SetNull)
+
+  @@unique([leadId, version])
+}
+
+// ───────────────────────────── Social proof & engagement ─────────────────────────────
+
+model Review {
+  id            String         @id @default(uuid(7))
+  userId        String?
+  bookingId     String? // set ⇒ "Verified traveller"
+  packageId     String?
+  activityId    String?
+  stayId        String?
+  rating        Int // 1–5
+  title         String?
+  body          String
+  travellerType TravellerType?
+  travelledOn   DateTime?      @db.Date
+  displayName   String
+  status        ReviewStatus   @default(PENDING)
+  source        String         @default("onsite") // onsite | google | trustpilot (imported)
+  helpfulCount  Int            @default(0)
+  replyBody     String?
+  createdAt     DateTime       @default(now())
+
+  user     User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  booking  Booking?      @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  package  Package?      @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  activity Activity?     @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  stay     Stay?         @relation(fields: [stayId], references: [id], onDelete: Cascade)
+  photos   GalleryItem[]
+
+  @@index([packageId, status])
+  @@index([activityId, status])
+  @@index([stayId, status])
+}
+
+model WishlistItem {
+  id         String   @id @default(uuid(7))
+  userId     String
+  packageId  String?
+  activityId String?
+  stayId     String?
+  createdAt  DateTime @default(now())
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  package  Package?  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  activity Activity? @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  stay     Stay?     @relation(fields: [stayId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, packageId])
+  @@unique([userId, activityId])
+  @@unique([userId, stayId])
+}
+
+model LoyaltyLedgerEntry {
+  id        String   @id @default(uuid(7))
+  userId    String
+  points    Int // +earn / −redeem
+  reason    String // booking | referral | review | redemption | expiry | adjustment
+  bookingId String?
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model NewsletterSubscriber {
+  id           String    @id @default(uuid(7))
+  email        String    @unique
+  locale       String    @default("en")
+  source       String?
+  confirmedAt  DateTime?
+  unsubscribedAt DateTime?
+  createdAt    DateTime  @default(now())
+}
+
+// ───────────────────────────── Content (CMS) ─────────────────────────────
+
+model Media {
+  id               String   @id @default(uuid(7))
+  storageKey       String   @unique // s3://…/originals/<semantic-file-name>.jpg
+  fileName         String // semantic: longtail-boats-railay-beach-krabi-thailand-sunset.jpg
+  mimeType         String
+  width            Int?
+  height           Int?
+  bytes            Int?
+  blurDataUrl      String? // LQIP placeholder
+  dominantColor    String?
+  alt              String // required, descriptive, keyword-rich
+  caption          String?
+  source           String // unsplash | pexels | commissioned | tourism_board | supplier | upload
+  sourceId         String? // provider photo id (dedupe)
+  sourceUrl        String?
+  photographerName String?
+  photographerUrl  String?
+  licence          String // "Unsplash License" | "Pexels License" | contract ref
+  focalPointX      Float? // 0–1 for art-directed crops
+  focalPointY      Float?
+  tags             String[]
+  uploadedById     String?
+  translations     Json? // localised alt text
+  createdAt        DateTime @default(now())
+
+  uploadedBy      User?             @relation("MediaUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+  userAvatars     User[]            @relation("UserAvatar")
+  regionHeroes    Region[]          @relation("RegionHero")
+  countryHeroes   Country[]         @relation("CountryHero")
+  cityHeroes      City[]            @relation("CityHero")
+  themeImages     Theme[]           @relation("ThemeMedia")
+  packageHeroes   Package[]         @relation("PackageHero")
+  activityHeroes  Activity[]        @relation("ActivityHero")
+  stayHeroes      Stay[]            @relation("StayHero")
+  blogCovers      BlogPost[]        @relation("BlogCover")
+  bannerImages    Banner[]          @relation("BannerMedia")
+  invoicePdfs     Invoice[]         @relation("InvoicePdf")
+  quotePdfs       Quote[]           @relation("QuotePdf")
+  bookingDocs     BookingDocument[] @relation("BookingDocumentFile")
+  galleryItems    GalleryItem[]
+
+  @@unique([source, sourceId])
+  @@index([tags])
+}
+
+/// Ordered gallery membership. Exactly one owner FK is set (enforced by a CHECK constraint in a raw-SQL migration).
+model GalleryItem {
+  id          String  @id @default(uuid(7))
+  mediaId     String
+  position    Int     @default(0)
+  countryId   String?
+  cityId      String?
+  packageId   String?
+  dayId       String?
+  activityId  String?
+  stayId      String?
+  reviewId    String?
+
+  media    Media         @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  country  Country?      @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  city     City?         @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  package  Package?      @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  day      ItineraryDay? @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  activity Activity?     @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  stay     Stay?         @relation(fields: [stayId], references: [id], onDelete: Cascade)
+  review   Review?       @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([packageId, position])
+  @@index([activityId, position])
+  @@index([stayId, position])
+}
+
+/// CMS page made of ordered, typed blocks (home page = 14 blocks). Block shapes are Zod schemas in packages/validation.
+model Page {
+  id             String        @id @default(uuid(7))
+  slug           String // "home", "about", "mice"…
+  locale         String        @default("en")
+  title          String
+  blocks         Json // [{ id, type: "hero" | "regionTiles" | ..., visible, props }]
+  status         PublishStatus @default(DRAFT)
+  scheduledAt    DateTime?
+  publishedAt    DateTime?
+  seoTitle       String?
+  seoDescription String?
+  ogMediaId      String?
+  noindex        Boolean       @default(false)
+  updatedById    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([slug, locale])
+}
+
+/// Header mega-menu, footer, mobile drawer. `items` validated by NavigationSchema (columns, links, badges, promo cards).
+model NavigationMenu {
+  id          String        @id @default(uuid(7))
+  key         String // header | footer | mobile-drawer | utility
+  locale      String        @default("en")
+  items       Json
+  status      PublishStatus @default(DRAFT)
+  version     Int           @default(1)
+  publishedAt DateTime?
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([key, locale])
+}
+
+model Banner {
+  id        String        @id @default(uuid(7))
+  placement String // home.deals | megamenu.deals | listing.top | exit-intent
+  title     String
+  subtitle  String?
+  ctaLabel  String?
+  ctaHref   String?
+  mediaId   String?
+  countdownTo DateTime?
+  startsAt  DateTime?
+  endsAt    DateTime?
+  priority  Int           @default(0)
+  audience  Json? // { countries, platforms, loggedIn }
+  status    PublishStatus @default(DRAFT)
+  translations Json?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  media Media? @relation("BannerMedia", fields: [mediaId], references: [id], onDelete: SetNull)
+
+  @@index([placement, status])
+}
+
+model BlogCategory {
+  id    String     @id @default(uuid(7))
+  slug  String     @unique
+  name  String
+  posts BlogPost[]
+}
+
+model BlogPost {
+  id             String        @id @default(uuid(7))
+  slug           String        @unique
+  title          String
+  excerpt        String?
+  body           Json // structured rich text (TipTap/ProseMirror JSON) — rendered to HTML on web, native on app
+  coverMediaId   String?
+  authorId       String
+  categoryId     String?
+  countryIds     String[] // internal linking to destinations
+  readingMinutes Int?
+  status         PublishStatus @default(DRAFT)
+  publishedAt    DateTime?
+  translations   Json?
+  seoTitle       String?
+  seoDescription String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  cover    Media?        @relation("BlogCover", fields: [coverMediaId], references: [id], onDelete: SetNull)
+  author   User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  category BlogCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([status, publishedAt])
+}
+
+model Redirect {
+  id         String   @id @default(uuid(7))
+  fromPath   String   @unique
+  toPath     String
+  statusCode Int      @default(301)
+  hits       Int      @default(0)
+  createdAt  DateTime @default(now())
+}
+
+/// Point-in-time snapshots for undo/preview of any CMS entity.
+model ContentRevision {
+  id          String   @id @default(uuid(7))
+  entityType  String
+  entityId    String
+  data        Json
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId, createdAt])
+}
+
+// ───────────────────────────── Platform ─────────────────────────────
+
+/// Feature flags + remote config shared by web and apps (GET /v1/config).
+model FeatureFlag {
+  key         String   @id
+  enabled     Boolean  @default(false)
+  value       Json?
+  platforms   DevicePlatform[]
+  minAppVersion String?
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+/// Append-only. Every admin write lands here (who, what, before/after).
+model AuditLog {
+  id         String   @id @default(uuid(7))
+  actorId    String?
+  action     String // "package.update", "booking.refund.approve"
+  entityType String
+  entityId   String?
+  before     Json?
+  after      Json?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+}

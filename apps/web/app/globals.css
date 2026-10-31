@@ -1,0 +1,67 @@
+@import '@asiavoyage/tokens/tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* next/font exposes hashed family names via these variables; map them onto the design tokens. */
+html {
+  --font-display: var(--font-playfair), Georgia, 'Times New Roman', serif;
+  --font-body: var(--font-jakarta), Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+@layer base {
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  /* Large desktops: scale all rem-based type, spacing and layout by 10%. */
+  @media (min-width: 1440px) {
+    html { font-size: 110%; }
+  }
+  body {
+    @apply bg-surface-warm font-body text-body text-ink-600 antialiased;
+  }
+  h1, h2, h3, h4 { @apply font-display text-ink-900; }
+  :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 4px; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}
+
+@layer components {
+  .container-av { @apply mx-auto w-full max-w-container px-4 lg:px-8; }
+  .btn-cta {
+    @apply inline-flex items-center justify-center gap-2 rounded-pill bg-cta px-5 py-2.5 text-small font-semibold text-cta-label transition-colors duration-200 hover:bg-cta-hover;
+  }
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 rounded-pill border border-primary px-5 py-2.5 text-small font-semibold text-primary transition-colors duration-200 hover:bg-primary-50;
+  }
+  .eyebrow { @apply text-micro font-semibold uppercase text-primary; }
+  .section { @apply py-12 lg:py-20; }
+  .card { @apply relative overflow-hidden rounded-card bg-surface shadow-card transition-shadow duration-200 hover:shadow-card-hover; }
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+}
+
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-panel { animation: panel-in var(--dur-menu-swap) var(--ease-standard); }
+
+@keyframes sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.animate-sheet { animation: sheet-in 250ms var(--ease-standard); }
+
+@keyframes header-in {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+.animate-header-in { animation: header-in 200ms ease; }
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.animate-fade { animation: fade-in 200ms var(--ease-standard); }
+
+@keyframes caret-blink { 50% { opacity: 0; } }
+.animate-caret { animation: caret-blink 1060ms steps(1) infinite; }

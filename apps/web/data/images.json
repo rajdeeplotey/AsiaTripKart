@@ -1,0 +1,372 @@
+{
+ "phiphi": {
+  "src": "/images/phi-phi-islands-aerial-thailand.jpg",
+  "width": 1920,
+  "height": 1078,
+  "title": "Phi Phi From Above (Unsplash).jpg",
+  "author": "Jakob Owens jakobowens1",
+  "license": "CC0",
+  "page": "https://commons.wikimedia.org/wiki/File:Phi_Phi_From_Above_(Unsplash).jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/48/Phi_Phi_From_Above_%28Unsplash%29.jpg/1920px-Phi_Phi_From_Above_%28Unsplash%29.jpg"
+ },
+ "bali": {
+  "src": "/images/bali-rice-terraces-indonesia.jpg",
+  "width": 1920,
+  "height": 1280,
+  "title": "Rice terraces, Bali.jpg",
+  "author": "Vyacheslav Argenberg",
+  "license": "CC BY 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Rice_terraces,_Bali.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8a/Rice_terraces%2C_Bali.jpg/1920px-Rice_terraces%2C_Bali.jpg"
+ },
+ "halong": {
+  "src": "/images/ha-long-bay-junk-boat-vietnam.jpg",
+  "width": 1920,
+  "height": 1440,
+  "title": "Traditional junk, Halong Bay, Quang Ninh, Vietnam - Vịnh Hạ Long, Quảng Ninh, Việt Nam (10226220073).jpg",
+  "author": "Romain Pontida",
+  "license": "CC BY-SA 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Traditional_junk,_Halong_Bay,_Quang_Ninh,_Vietnam_-_V%E1%BB%8Bnh_H%E1%BA%A1_Long,_Qu%E1%BA%A3ng_Ninh,_Vi%E1%BB%87t_Nam_(10226220073).jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/Traditional_junk%2C_Halong_Bay%2C_Quang_Ninh%2C_Vietnam_-_V%E1%BB%8Bnh_H%E1%BA%A1_Long%2C_Qu%E1%BA%A3ng_Ninh%2C_Vi%E1%BB%87t_Nam_%2810226220073%29.jpg/1920px-Traditional_junk%2C_Halong_Bay%2C_Quang_Ninh%2C_Vietnam_-_V%E1%BB%8Bnh_H%E1%BA%A1_Long%2C_Qu%E1%BA%A3ng_Ninh%2C_Vi%E1%BB%87t_Nam_%2810226220073%29.jpg"
+ },
+ "fuji": {
+  "src": "/images/chureito-pagoda-mount-fuji-japan.jpg",
+  "width": 1920,
+  "height": 1081,
+  "title": "Chureito Pagoda and Mount Fuji 2023-03-07.jpg",
+  "author": "Stjepko Krehula",
+  "license": "CC BY 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Chureito_Pagoda_and_Mount_Fuji_2023-03-07.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/53/Chureito_Pagoda_and_Mount_Fuji_2023-03-07.jpg/1920px-Chureito_Pagoda_and_Mount_Fuji_2023-03-07.jpg"
+ },
+ "maldives": {
+  "src": "/images/maldives-overwater-villas.jpg",
+  "width": 1920,
+  "height": 1028,
+  "title": "Diamonds Thudufushi Beach and Water Villas, May 2017 -04.jpg",
+  "author": "Martin Falbisoner",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Diamonds_Thudufushi_Beach_and_Water_Villas,_May_2017_-04.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/Diamonds_Thudufushi_Beach_and_Water_Villas%2C_May_2017_-04.jpg/1920px-Diamonds_Thudufushi_Beach_and_Water_Villas%2C_May_2017_-04.jpg"
+ },
+ "dubai": {
+  "src": "/images/dubai-skyline-burj-khalifa-dusk.jpg",
+  "width": 1920,
+  "height": 1280,
+  "title": "Dubai Skyline mit Burj Khalifa (18241030269).jpg",
+  "author": "Tim Reckmann from Hamm, Deutschland",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Dubai_Skyline_mit_Burj_Khalifa_(18241030269).jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cc/Dubai_Skyline_mit_Burj_Khalifa_%2818241030269%29.jpg/1920px-Dubai_Skyline_mit_Burj_Khalifa_%2818241030269%29.jpg"
+ },
+ "r_sea": {
+  "src": "/images/angkor-wat-sunrise-209237385.jpg",
+  "width": 1920,
+  "height": 1080,
+  "title": "Angkor Wat Sunrise (209237385).jpeg",
+  "author": "Reinhard Onasch",
+  "license": "CC BY-SA 3.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Angkor_Wat_Sunrise_(209237385).jpeg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/03/Angkor_Wat_Sunrise_%28209237385%29.jpeg/1920px-Angkor_Wat_Sunrise_%28209237385%29.jpeg"
+ },
+ "r_south": {
+  "src": "/images/himalaya-sunrise.jpg",
+  "width": 1920,
+  "height": 1280,
+  "title": "Himalaya sunrise.jpg",
+  "author": "Ali Sabbagh",
+  "license": "CC0",
+  "page": "https://commons.wikimedia.org/wiki/File:Himalaya_sunrise.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9f/Himalaya_sunrise.jpg/1920px-Himalaya_sunrise.jpg"
+ },
+ "r_east": {
+  "src": "/images/four-ladies-wearing-a-yukata-in-front-of-the-north-gate-of-kiyomizu-de.jpg",
+  "width": 1920,
+  "height": 1280,
+  "title": "Four ladies wearing a yukata in front of the North Gate of Kiyomizu-dera temple Kyoto Japan.jpg",
+  "author": "Basile Morin",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Four_ladies_wearing_a_yukata_in_front_of_the_North_Gate_of_Kiyomizu-dera_temple_Kyoto_Japan.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d8/Four_ladies_wearing_a_yukata_in_front_of_the_North_Gate_of_Kiyomizu-dera_temple_Kyoto_Japan.jpg/1920px-Four_ladies_wearing_a_yukata_in_front_of_the_North_Gate_of_Kiyomizu-dera_temple_Kyoto_Japan.jpg"
+ },
+ "r_central": {
+  "src": "/images/registan-square-samarkand-uzbekistan.jpg",
+  "width": 1920,
+  "height": 1139,
+  "title": "Самарканд. Площадь-Регистан.jpg",
+  "author": "Kraftabbas",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:%D0%A1%D0%B0%D0%BC%D0%B0%D1%80%D0%BA%D0%B0%D0%BD%D0%B4._%D0%9F%D0%BB%D0%BE%D1%89%D0%B0%D0%B4%D1%8C-%D0%A0%D0%B5%D0%B3%D0%B8%D1%81%D1%82%D0%B0%D0%BD.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fe/%D0%A1%D0%B0%D0%BC%D0%B0%D1%80%D0%BA%D0%B0%D0%BD%D0%B4._%D0%9F%D0%BB%D0%BE%D1%89%D0%B0%D0%B4%D1%8C-%D0%A0%D0%B5%D0%B3%D0%B8%D1%81%D1%82%D0%B0%D0%BD.jpg/1920px-%D0%A1%D0%B0%D0%BC%D0%B0%D1%80%D0%BA%D0%B0%D0%BD%D0%B4._%D0%9F%D0%BB%D0%BE%D1%89%D0%B0%D0%B4%D1%8C-%D0%A0%D0%B5%D0%B3%D0%B8%D1%81%D1%82%D0%B0%D0%BD.jpg"
+ },
+ "r_west": {
+  "src": "/images/hot-air-balloon-at-sunrise-over-cappadocia-turkey.jpg",
+  "width": 1920,
+  "height": 1280,
+  "title": "Hot air balloon at sunrise over Cappadocia, Turkey.JPG",
+  "author": "MusikAnimal",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Hot_air_balloon_at_sunrise_over_Cappadocia,_Turkey.JPG",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7e/Hot_air_balloon_at_sunrise_over_Cappadocia%2C_Turkey.JPG/1920px-Hot_air_balloon_at_sunrise_over_Cappadocia%2C_Turkey.JPG"
+ },
+ "r_north": {
+  "src": "/images/ice-cave-on-olkhon-island.jpg",
+  "width": 1920,
+  "height": 1281,
+  "title": "Ice cave on Olkhon island.jpg",
+  "author": "Sergey Pesterev",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Ice_cave_on_Olkhon_island.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/84/Ice_cave_on_Olkhon_island.jpg/1920px-Ice_cave_on_Olkhon_island.jpg"
+ },
+ "singapore": {
+  "src": "/images/skylines-of-the-central-business-district-singapore-at-dusk.jpg",
+  "width": 1920,
+  "height": 1280,
+  "title": "Skylines of the Central Business District, Singapore at dusk.jpg",
+  "author": "Basile Morin",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Skylines_of_the_Central_Business_District,_Singapore_at_dusk.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/27/Skylines_of_the_Central_Business_District%2C_Singapore_at_dusk.jpg/1920px-Skylines_of_the_Central_Business_District%2C_Singapore_at_dusk.jpg"
+ },
+ "srilanka": {
+  "src": "/images/nine-arch-bridge-in-sri-lanka.jpg",
+  "width": 1920,
+  "height": 1440,
+  "title": "Nine-Arch Bridge in Sri Lanka.jpg",
+  "author": "Ravindu Thaksara",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Nine-Arch_Bridge_in_Sri_Lanka.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/70/Nine-Arch_Bridge_in_Sri_Lanka.jpg/1920px-Nine-Arch_Bridge_in_Sri_Lanka.jpg"
+ },
+ "bhutan": {
+  "src": "/images/paro-taktsang-bhutan-edited.jpg",
+  "width": 1920,
+  "height": 1257,
+  "title": "Paro Taktsang, Bhutan (edited).jpg",
+  "author": "Original: Nina R from Africa Derivative work: UnpetitproleX",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Paro_Taktsang,_Bhutan_(edited).jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a6/Paro_Taktsang%2C_Bhutan_%28edited%29.jpg/1920px-Paro_Taktsang%2C_Bhutan_%28edited%29.jpg"
+ },
+ "georgia": {
+  "src": "/images/old-tbilisi-armenian-quarter.jpg",
+  "width": 1920,
+  "height": 1440,
+  "title": "Old Tbilisi -- Armenian Quarter.jpg",
+  "author": "Ian.Climacus",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Old_Tbilisi_--_Armenian_Quarter.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/66/Old_Tbilisi_--_Armenian_Quarter.jpg/1920px-Old_Tbilisi_--_Armenian_Quarter.jpg"
+ },
+ "seoul": {
+  "src": "/images/gyeonghoeru-royal-banquet-hall-at-gyeongbokgung-palace-seoul.jpg",
+  "width": 1920,
+  "height": 1280,
+  "title": "Gyeonghoeru (Royal Banquet Hall) at Gyeongbokgung Palace, Seoul.jpg",
+  "author": "Frank Schulenburg",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Gyeonghoeru_(Royal_Banquet_Hall)_at_Gyeongbokgung_Palace,_Seoul.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5d/Gyeonghoeru_%28Royal_Banquet_Hall%29_at_Gyeongbokgung_Palace%2C_Seoul.jpg/1920px-Gyeonghoeru_%28Royal_Banquet_Hall%29_at_Gyeongbokgung_Palace%2C_Seoul.jpg"
+ },
+ "kashmir": {
+  "src": "/images/empty-shikara-on-dal-lake-srinagar-india-2013-08-23-flickr-9967093983.jpg",
+  "width": 1920,
+  "height": 1298,
+  "title": "Empty shikara on Dal Lake, Srinagar, India 2013-08-23 (flickr 9967093983).jpg",
+  "author": "Fulvio Spada from Torino, Italy",
+  "license": "CC BY-SA 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Empty_shikara_on_Dal_Lake,_Srinagar,_India_2013-08-23_(flickr_9967093983).jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/16/Empty_shikara_on_Dal_Lake%2C_Srinagar%2C_India_2013-08-23_%28flickr_9967093983%29.jpg/1920px-Empty_shikara_on_Dal_Lake%2C_Srinagar%2C_India_2013-08-23_%28flickr_9967093983%29.jpg"
+ },
+ "kerala": {
+  "src": "/images/kerala-backwaters-houseboats-india.jpg",
+  "width": 1920,
+  "height": 1280,
+  "title": "Kerala backwaters, Houseboats, India.jpg",
+  "author": "Vyacheslav Argenberg",
+  "license": "CC BY 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Kerala_backwaters,_Houseboats,_India.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4e/Kerala_backwaters%2C_Houseboats%2C_India.jpg/1920px-Kerala_backwaters%2C_Houseboats%2C_India.jpg"
+ },
+ "nepal": {
+  "src": "/images/boudha-stupa-2018-04.jpg",
+  "width": 1920,
+  "height": 1280,
+  "title": "Boudha Stupa 2018 04.jpg",
+  "author": "Nabin K. Sapkota",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Boudha_Stupa_2018_04.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/44/Boudha_Stupa_2018_04.jpg/1920px-Boudha_Stupa_2018_04.jpg"
+ },
+ "krabi": {
+  "src": "/images/playa-maya-ko-phi-phi-tailandia-2013-08-19-dd-13.jpg",
+  "width": 1920,
+  "height": 1183,
+  "title": "Playa Maya, Ko Phi Phi, Tailandia, 2013-08-19, DD 13.JPG",
+  "author": "Diego Delso",
+  "license": "CC BY-SA 3.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Playa_Maya,_Ko_Phi_Phi,_Tailandia,_2013-08-19,_DD_13.JPG",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/97/Playa_Maya%2C_Ko_Phi_Phi%2C_Tailandia%2C_2013-08-19%2C_DD_13.JPG/1920px-Playa_Maya%2C_Ko_Phi_Phi%2C_Tailandia%2C_2013-08-19%2C_DD_13.JPG"
+ },
+ "hoian": {
+  "src": "/images/lanterns-in-hoi-an-3.jpg",
+  "width": 1920,
+  "height": 1440,
+  "title": "Lanterns in Hoi An 3.jpg",
+  "author": "Christophe95",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Lanterns_in_Hoi_An_3.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/be/Lanterns_in_Hoi_An_3.jpg/1920px-Lanterns_in_Hoi_An_3.jpg"
+ },
+ "act_gardens": {
+  "src": "/images/supertree-grove-gardens-by-the-bay-singapore1.jpg",
+  "width": 1920,
+  "height": 1080,
+  "title": "Supertree Grove, Gardens by the Bay, Singapore1.jpg",
+  "author": "Mustang Joe",
+  "license": "CC0",
+  "page": "https://commons.wikimedia.org/wiki/File:Supertree_Grove,_Gardens_by_the_Bay,_Singapore1.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/16/Supertree_Grove%2C_Gardens_by_the_Bay%2C_Singapore1.jpg/1920px-Supertree_Grove%2C_Gardens_by_the_Bay%2C_Singapore1.jpg"
+ },
+ "act_desert": {
+  "src": "/images/desert-safari-dubai.jpg",
+  "width": 1920,
+  "height": 1440,
+  "title": "Desert Safari - Dubai.JPG",
+  "author": ":en:Siddeshindia (talk | contribs)",
+  "license": "CC BY-SA 3.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Desert_Safari_-_Dubai.JPG",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/57/Desert_Safari_-_Dubai.JPG/1920px-Desert_Safari_-_Dubai.JPG"
+ },
+ "act_inari": {
+  "src": "/images/torii-path-with-lantern-at-fushimi-inari-taisha-shrine-kyoto-japan.jpg",
+  "width": 1920,
+  "height": 1280,
+  "title": "Torii path with lantern at Fushimi Inari Taisha Shrine, Kyoto, Japan.jpg",
+  "author": "Basile Morin",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Torii_path_with_lantern_at_Fushimi_Inari_Taisha_Shrine,_Kyoto,_Japan.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0e/Torii_path_with_lantern_at_Fushimi_Inari_Taisha_Shrine%2C_Kyoto%2C_Japan.jpg/1920px-Torii_path_with_lantern_at_Fushimi_Inari_Taisha_Shrine%2C_Kyoto%2C_Japan.jpg"
+ },
+ "act_nusa": {
+  "src": "/images/kelingking-beach-t-rex-bay-of-nusa-penida-bali-2025-img-08.jpg",
+  "width": 1920,
+  "height": 1440,
+  "title": "Kelingking Beach (T-Rex Bay) of Nusa Penida, Bali (2025) - img 08.jpg",
+  "author": "Chainwit.",
+  "license": "CC BY 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Kelingking_Beach_(T-Rex_Bay)_of_Nusa_Penida,_Bali_(2025)_-_img_08.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/11/Kelingking_Beach_%28T-Rex_Bay%29_of_Nusa_Penida%2C_Bali_%282025%29_-_img_08.jpg/1920px-Kelingking_Beach_%28T-Rex_Bay%29_of_Nusa_Penida%2C_Bali_%282025%29_-_img_08.jpg"
+ },
+ "act_bangkok": {
+  "src": "/images/a-roof-of-a-building-at-the-grand-palace-bangkok-sunrise-2017.jpg",
+  "width": 1920,
+  "height": 1277,
+  "title": "A roof of a building at the Grand Palace, Bangkok, sunrise, 2017.jpg",
+  "author": "Bjørn Erik Pedersen",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:A_roof_of_a_building_at_the_Grand_Palace,_Bangkok,_sunrise,_2017.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/30/A_roof_of_a_building_at_the_Grand_Palace%2C_Bangkok%2C_sunrise%2C_2017.jpg/1920px-A_roof_of_a_building_at_the_Grand_Palace%2C_Bangkok%2C_sunrise%2C_2017.jpg"
+ },
+ "act_seoul": {
+  "src": "/images/seoul-175734251.jpg",
+  "width": 1920,
+  "height": 1440,
+  "title": "Seoul (175734251).jpeg",
+  "author": "Joon Kyu Park",
+  "license": "CC BY-SA 3.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Seoul_(175734251).jpeg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/81/Seoul_%28175734251%29.jpeg/1920px-Seoul_%28175734251%29.jpeg"
+ },
+ "plan": {
+  "src": "/images/pangong-tso-2.jpg",
+  "width": 1920,
+  "height": 929,
+  "title": "Pangong Tso 2.jpg",
+  "author": "KennyOMG",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Pangong_Tso_2.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8b/Pangong_Tso_2.jpg/1920px-Pangong_Tso_2.jpg"
+ },
+ "jordan": {
+  "src": "/images/al-khazneh-the-treasury-2-petra-jordan.jpg",
+  "width": 1920,
+  "height": 1280,
+  "title": "Al-Khazneh (The Treasury) 2, Petra, Jordan.jpg",
+  "author": "Vyacheslav Argenberg",
+  "license": "CC BY 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Al-Khazneh_(The_Treasury)_2,_Petra,_Jordan.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/40/Al-Khazneh_%28The_Treasury%29_2%2C_Petra%2C_Jordan.jpg/1920px-Al-Khazneh_%28The_Treasury%29_2%2C_Petra%2C_Jordan.jpg"
+ },
+ "uzbek": {
+  "src": "/images/old-town-of-bukhara-02.jpg",
+  "width": 1920,
+  "height": 1280,
+  "title": "Old town of Bukhara 02.jpg",
+  "author": "Davide Mauro",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Old_town_of_Bukhara_02.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1b/Old_town_of_Bukhara_02.jpg/1920px-Old_town_of_Bukhara_02.jpg"
+ },
+ "hero_japan": {
+  "src": "/images/mount-fuji-autumn-maple-lake-kawaguchi-japan.jpg",
+  "width": 3840,
+  "height": 2560,
+  "title": "Autumn leaf color and Mount Fuji from Lake Kawaguchi.jpg",
+  "author": "Alpsdake",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Autumn_leaf_color_and_Mount_Fuji_from_Lake_Kawaguchi.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/ca/Autumn_leaf_color_and_Mount_Fuji_from_Lake_Kawaguchi.jpg/3840px-Autumn_leaf_color_and_Mount_Fuji_from_Lake_Kawaguchi.jpg"
+ },
+ "hero_taj": {
+  "src": "/images/taj-mahal-agra-india.jpg",
+  "width": 3840,
+  "height": 2525,
+  "title": "Taj Mahal, Agra, India edit2.jpg",
+  "author": "Yann; edited by King of Hearts",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Taj_Mahal,_Agra,_India_edit2.jpg",
+  "remote": "https://upload.wikimedia.org/wikipedia/commons/7/74/Taj_Mahal%2C_Agra%2C_India_edit2.jpg"
+ },
+ "hero_vietnam": {
+  "src": "/images/lan-ha-bay-karst-cliffs-vietnam.jpg",
+  "width": 3840,
+  "height": 2880,
+  "title": "Lan Ha Bay 05.jpg",
+  "author": "Christophe95",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Lan_Ha_Bay_05.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8e/Lan_Ha_Bay_05.jpg/3840px-Lan_Ha_Bay_05.jpg"
+ },
+ "hero_maldives": {
+  "src": "/images/maldives-turquoise-lagoon-beach.jpg",
+  "width": 3840,
+  "height": 2560,
+  "title": "Strand Malediven (28825238783).jpg",
+  "author": "dronepicr",
+  "license": "CC BY 2.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Strand_Malediven_(28825238783).jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/75/Strand_Malediven_%2828825238783%29.jpg/3840px-Strand_Malediven_%2828825238783%29.jpg"
+ },
+ "hero_dubai": {
+  "src": "/images/dubai-skyline-burj-khalifa-blue-hour.jpg",
+  "width": 3840,
+  "height": 2560,
+  "title": "Dubai skyline unsplash.jpg",
+  "author": "Robert Bock",
+  "license": "CC0",
+  "page": "https://commons.wikimedia.org/wiki/File:Dubai_skyline_unsplash.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e4/Dubai_skyline_unsplash.jpg/3840px-Dubai_skyline_unsplash.jpg"
+ },
+ "hero_singapore": {
+  "src": "/images/marina-bay-sands-helix-bridge-singapore.jpg",
+  "width": 3840,
+  "height": 2181,
+  "title": "Puente Helix, museo ArtScience y hotel Marina Bay Sands, Marina Bay, Singapur, 2023-08-17, DD 67-69 HDR.jpg",
+  "author": "Diego Delso",
+  "license": "CC BY-SA 4.0",
+  "page": "https://commons.wikimedia.org/wiki/File:Puente_Helix,_museo_ArtScience_y_hotel_Marina_Bay_Sands,_Marina_Bay,_Singapur,_2023-08-17,_DD_67-69_HDR.jpg",
+  "remote": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/df/Puente_Helix%2C_museo_ArtScience_y_hotel_Marina_Bay_Sands%2C_Marina_Bay%2C_Singapur%2C_2023-08-17%2C_DD_67-69_HDR.jpg/3840px-Puente_Helix%2C_museo_ArtScience_y_hotel_Marina_Bay_Sands%2C_Marina_Bay%2C_Singapur%2C_2023-08-17%2C_DD_67-69_HDR.jpg"
+ }
+}
